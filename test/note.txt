@@ -1,0 +1,2 @@
+tests are not set to the highest level of assertion strictness due to:
+https://github.com/avajs/ava/issues/1481
