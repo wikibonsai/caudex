@@ -3,9 +3,9 @@
 [![A WikiBonsai Project](https://img.shields.io/badge/%F0%9F%8E%8B-A%20WikiBonsai%20Project-brightgreen)](https://github.com/wikibonsai/wikibonsai)
 [![NPM package](https://img.shields.io/npm/v/caudex)](https://npmjs.org/package/caudex)
 
-<div style="width:100%; display: flex; justify-content: center;">
+<p align="center">
   <img src="./caudex.svg" width="300" height="300"/>
-</div>
+</p>
 
 .[^inspire]
 
