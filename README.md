@@ -108,7 +108,7 @@ Finally, "Actions" are functions that perform some action on the `caudex` or a n
 
 ## Other Terms
 
-There are also wikibonsai-specific terminologies that you can read more about [here](https://github.com/wikibonsai/wikibonsai/terms).
+There are also wikibonsai-specific terminologies that you can read more about [here](https://github.com/wikibonsai/wikibonsai/blob/main/docs/TERMS.md).
 
 ## API
 
@@ -230,7 +230,7 @@ Returns the numeric level of the target node.
 
 #### Actions
 
-##### `flushREL.FAMs`
+##### `flushRelFams()`
 
 Flush / delete family relationships in the caudex.
 
@@ -308,7 +308,7 @@ Return an array of node ids for all neighbors / references.
 
 #### Actions
 
-##### `flushREL.REFs([id: string]): boolean`
+##### `flushRelRefs([id: string]): boolean`
 
 Flush / delete all reference relationships. If no id is given, flush all reference
 
@@ -328,8 +328,8 @@ Disconnect a `source` node id from a `target` node id of the given `ref` type (a
 
 ## TODO
 
-https://github.com/stopachka/datalogJS
-https://github.com/pouchdb/pouchdb
+- https://github.com/stopachka/datalogJS
+- https://github.com/pouchdb/pouchdb
 
 
 [^inspire]: Logo inspired by [databases](https://cdn-icons-png.flaticon.com/512/20/20093.png) and [caudexes](https://www.google.com/search?q=caudex&source=lnms&tbm=isch&sa=X&ved=2ahUKEwiD_LbPwr36AhUsRTABHdXOBq0Q_AUoAXoECAIQAw&biw=1011&bih=800&dpr=2) -- especially [this one](https://thumbs.dreamstime.com/z/adenium-shrub-branched-caudex-green-foliage-illustration-colored-pencils-229255411.jpg).
