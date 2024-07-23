@@ -238,7 +238,7 @@ Flush / delete family relationships in the caudex.
 
 Graft a node with the given `childID` to another node with the given `parentID`.
 
-To perform subtree-sized changes, see [`transplant()`]().
+To perform subtree-sized changes, see [`transplant()`](https://github.com/wikibonsai/caudex/?tab=readme-ov-file#transplantsubrootid-string-subtree--id-string-children-string--boolean).
 
 ##### `replace(source: string, target: string): Node | undefined`
 
@@ -252,7 +252,7 @@ Replace a subtree in the tree with another subtree. This will return `true` if t
 
 Prune a node with the given `childID` from another node with the given `parentID`. This method will fail if the node with the given `childID` has children.
 
-To perform subtree-sized changes, see [`transplant()`]().
+To perform subtree-sized changes, see [`transplant()`](https://github.com/wikibonsai/caudex/?tab=readme-ov-file#transplantsubrootid-string-subtree--id-string-children-string--boolean).
 
 ##### `printTree()`
 
