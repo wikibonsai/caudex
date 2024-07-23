@@ -91,9 +91,9 @@ describe('tree', () => {
     *    5 <--- orphan
     */
     bonsai.setRoot('1');
-    bonsai.graft('2', ['one'], 'filename');
-    bonsai.graft('3', ['one', 'two'], 'filename');
-    bonsai.graft('4', ['one', 'two'], 'filename');
+    bonsai.graft('1', '2');
+    bonsai.graft('2', '3');
+    bonsai.graft('2', '4');
   });
 
   afterEach(() => {
@@ -149,8 +149,8 @@ describe('tree', () => {
        *    3
        */
       initBonsai.setRoot('1');
-      initBonsai.graft('2', ['one'], 'filename');
-      initBonsai.graft('3', ['one', 'two'], 'filename');
+      initBonsai.graft('1', '2');
+      initBonsai.graft('2', '3');
       // test
       assert.deepEqual(initBonsai.lineage('1'), ['2', '3']);
       assert.deepEqual(initBonsai.lineage('2'), ['1', '3']);
@@ -540,42 +540,21 @@ describe('tree', () => {
 
     });
 
-    describe('flushRelFams()', () => {
-
-      it(NODE.TYPE.DEFAULT, () => {
-        // setup
-        const testNode1: Node | undefined = bonsai.get('1');
-        const testNode2: Node | undefined = bonsai.get('2');
-        // pretest
-        if (!testNode1) { assert.fail(); }
-        if (!testNode2) { assert.fail(); }
-        assert.deepEqual(testNode1.children, ['2']);
-        assert.deepEqual(testNode2.children, ['3', '4']);
-        // exec
-        assert.strictEqual(bonsai.flushRelFams(), true);
-        // test
-        assert.deepEqual(testNode1.children, []);
-        assert.deepEqual(testNode2.children, []);
-      });
-
-    });
-
     describe('node lvl', () => {
 
       describe('graft()', () => {
 
-        it('node exists; full path already populated', () => {
-        /*
-          *    1
-          *    |
-          *    2 
-          *   / \
-          *  3   4
-          *       \
-          *        5 <-- graft / insert
-          */
-          // read as: graft node with id '5' via the path defined by node 'filename's with the given path 'One', 'Two', and 'Four'.
-          assert.deepEqual(bonsai.graft('5', ['one', 'two', 'four'], 'filename'), true);
+        it('node exists; success', () => {
+          /*
+           *    1
+           *    |
+           *    2 
+           *   / \
+           *  3   4
+           *       \
+           *        5 <-- graft / insert
+           */
+          assert.deepEqual(bonsai.graft('4', '5'), true);
           // parent
           assert.deepEqual(bonsai.children('4'), ['5']);
           assert.deepEqual(bonsai.lineage('4'), ['1', '2', '5']);
@@ -585,93 +564,62 @@ describe('tree', () => {
           assert.deepEqual(bonsai.lineage('5'), ['1', '2', '4']);
         });
 
-        it('node exists; full path not (yet) populated', () => {
-        /*
-          *    1
-          *    |
-          *    2 
-          *   / \
-          *  3   4
-          *       \
-          *       ( )  <-- missing node, which is populated with an id
-          *         \
-          *          5 <-- graft / insert
-          */
-          // read as: graft node with id '5' via the path defined by node 'filename's with the given path 'One', 'Two', 'Four', and 'Missing'.
-          assert.deepEqual(bonsai.graft('5', ['one', 'two', 'four', 'missing'], 'filename'), true);
-          // parent
-          assert.deepEqual(bonsai.children('4'), ['404']);
-          assert.deepEqual(bonsai.lineage('4'), ['1', '2', '404', '5']);
-          // missing
-          assert.deepEqual(bonsai.get('404'), {
-            id: '404',
-            kind: NODE.KIND.ZOMBIE,
-            type: undefined,
-            data: {
-              filename: 'missing',
-            },
-            children: ['5'],
-            attrs: {},
-            links: [],
-            embeds: [],
-          });
-          // child
-          assert.deepEqual(bonsai.parent('5'), '404');
-          assert.deepEqual(bonsai.ancestors('5'), ['1', '2', '4', '404']);
-          assert.deepEqual(bonsai.lineage('5'), ['1', '2', '4', '404']);
-        });
-
-        // todo
-        it('missing node; fill in data of missing node', () => {
+        it('node exists; already in tree (above); do not graft', () => {
           /*
-          *    1
-          *    |
-          *    2 
-          *   / \
-          *  3   4
-          *       \
-          *      (404) <-- graft / insert missing node
-          *         \
-          *          5
-          */
-          // read as: graft node with id '5' via the path defined by node 'filename's with the given path 'One', 'Two', 'Four', and 'Missing'.
-          assert.deepEqual(bonsai.graft('5', ['one', 'two', 'four', 'missing'], 'filename'), true);
-          // before
-          assert.deepEqual(bonsai.get('404'), {
-            id: '404',
-            kind: NODE.KIND.ZOMBIE,
-            type: undefined,
-            data: {
-              filename: 'missing',
-            },
-            children: ['5'],
-            attrs: {},
-            links: [],
-            embeds: [],
-          });
-          // adding
-          bonsai.fill('404', {
-            filename: 'not-missing',
-          });
-          // after
-          assert.deepEqual(bonsai.get('404'), {
-            id: '404',
-            kind: NODE.KIND.DOC,
-            type: NODE.TYPE.DEFAULT,
-            data: {
-              filename: 'not-missing',
-            },
-            children: ['5'],
-            attrs: {},
-            links: [],
-            embeds: [],
-          });
-        });
-    
-        it('error; node does not exist; do not graft', () => {
+           *    1
+           *    |
+           *    2 <----- already exists
+           *   / \
+           *  3   4
+           *       \
+           *        2 <-- do not graft / insert
+           */
           // before
           assert.deepEqual(bonsai.children('1'), ['2']);
-          assert.deepEqual(bonsai.graft('-1', ['one'], 'filename'), false);
+          assert.deepEqual(bonsai.lineage('4'), ['1', '2']);
+          // go
+          assert.deepEqual(bonsai.graft('4', '2'), false);
+          // after
+          assert.deepEqual(bonsai.children('1'), ['2']);
+          assert.deepEqual(bonsai.lineage('4'), ['1', '2']);
+        });
+
+        it('node exists; already in tree (below); do not graft', () => {
+          /*
+           *    1
+           *    |
+           *    4 <-- do not graft / insert
+           *    |
+           *    2
+           *   / \
+           *  3   4 <----- already exists
+           *
+           */
+          // before
+          assert.deepEqual(bonsai.children('1'), ['2']);
+          assert.deepEqual(bonsai.lineage('4'), ['1', '2']);
+          // go
+          assert.deepEqual(bonsai.graft('1', '4'), false);
+          // after
+          assert.deepEqual(bonsai.children('1'), ['2']);
+          assert.deepEqual(bonsai.lineage('4'), ['1', '2']);
+        });
+
+
+        it('error; parent node does not exist; do not graft', () => {
+          // before
+          assert.deepEqual(bonsai.children('1'), ['2']);
+          // go
+          assert.deepEqual(bonsai.graft('-1', '1'), false);
+          // after
+          assert.deepEqual(bonsai.children('1'), ['2']);
+        });
+
+        it('error; child node does not exist; do not graft', () => {
+          // before
+          assert.deepEqual(bonsai.children('1'), ['2']);
+          // go
+          assert.deepEqual(bonsai.graft('1', '-1'), false);
           // after
           assert.deepEqual(bonsai.children('1'), ['2']);
         });
@@ -701,8 +649,9 @@ describe('tree', () => {
           assert.deepEqual(bonsai.parent(testSourceNode.id), '1');
           assert.deepEqual(testSourceNode.children, ['3', '4']);
           // exec
-          const replacedNode: Node | undefined = bonsai.replace(testSourceNode.id, testTargetNode.id);
+          assert.deepEqual(bonsai.replace(testSourceNode.id, testTargetNode.id), true);
           // test
+          const replacedNode: Node | undefined = bonsai.get('5');
           if (!replacedNode) { assert.fail(); }
           assert.deepEqual(bonsai.orphans(treeIDs), ['2']);
           assert.deepEqual(testSourceNode.children, []);
@@ -713,7 +662,7 @@ describe('tree', () => {
 
         it('target node cannot already exist in tree', () => {
           // test
-          assert.strictEqual(bonsai.replace('2', '1'), undefined);
+          assert.strictEqual(bonsai.replace('2', '1'), false);
           // after
           assert.strictEqual(fakeConsoleWarn.called, true);
           assert.strictEqual(fakeConsoleWarn.getCall(0).args[0], 'target with "id" "1" already exists in tree');
@@ -721,25 +670,127 @@ describe('tree', () => {
 
         it('source node does not exist', () => {
           // test
-          assert.strictEqual(bonsai.replace('-1', '1'), undefined);
+          assert.strictEqual(bonsai.replace('-1', '1'), false);
           // after
           assert.strictEqual(fakeConsoleWarn.called, true);
-          assert.strictEqual(fakeConsoleWarn.getCall(0).args[0], 'node with "id" "-1" does not exist');
+          assert.strictEqual(fakeConsoleWarn.getCall(0).args[0], 'node with id "-1" does not exist');
         });
 
         it('target node does not exist', () => {
           // test
-          assert.strictEqual(bonsai.replace('1', '-1'), undefined);
+          assert.strictEqual(bonsai.replace('1', '-1'), false);
           // after
           assert.strictEqual(fakeConsoleWarn.called, true);
-          assert.strictEqual(fakeConsoleWarn.getCall(0).args[0], 'node with "id" "-1" does not exist');
+          assert.strictEqual(fakeConsoleWarn.getCall(0).args[0], 'node with id "-1" does not exist');
+        });
+
+      });
+
+      describe('transplant()', () => {
+
+        it('nodes exists', () => {
+          /*
+           * before:
+           *    1
+           *    |
+           *    2 
+           *   / \
+           *  3   4
+           * 
+           *    2          5
+           *   / \  -->  / | \
+           *  3   4     2  3  4
+           *
+           * after:
+           *     1
+           *     |
+           *     5 
+           *   / | \
+           *  2  3  4
+           */
+          // before
+          assert.deepStrictEqual(bonsai.get('1').children, ['2']);
+          assert.deepStrictEqual(bonsai.get('2').children, ['3', '4']);
+          assert.deepStrictEqual(bonsai.get('5').children, []);
+          // go
+          const subtree: any = [
+            { id: '1', children: ['5'] },
+            { id: '5', children: ['2', '3', '4'] },
+            { id: '2', children: [] },
+            { id: '3', children: [] },
+            { id: '4', children: [] }
+          ];
+          assert.strictEqual(bonsai.transplant('1', subtree), true);
+          // after
+          assert.deepStrictEqual(bonsai.get('1').children, ['5']);
+          assert.deepStrictEqual(bonsai.get('5').children, ['2', '3', '4']);
+          assert.deepStrictEqual(bonsai.get('2').children, []);
+          assert.deepStrictEqual(bonsai.get('3').children, []);
+          assert.deepStrictEqual(bonsai.get('4').children, []);
+        });
+
+        it('invalid; subroot not included in subtree', () => {
+          // before
+          assert.deepStrictEqual(bonsai.get('1').children, ['2']);
+          // go
+          const subtree: any = [{ id: '5', children: ['2'] }];
+          assert.strictEqual(bonsai.transplant('1', subtree), false);
+          // after
+          assert.deepStrictEqual(bonsai.get('1').children, ['2']);
+          assert.strictEqual(fakeConsoleWarn.calledWith('subroot with id "1" not found in the subtree'), true);
+        });
+
+        it('subtree invalid; subroot does not exist', () => {
+          // before
+          assert.strictEqual(bonsai.has('5'), true);
+          assert.strictEqual(bonsai.has('6'), false);
+          // go
+          const subtree: any = [{ id: '6', children: ['5'] }];
+          assert.strictEqual(bonsai.transplant('6', subtree), false);
+          // after
+          assert.strictEqual(bonsai.has('6'), false);
+          assert.strictEqual(fakeConsoleWarn.calledWith('subroot with id "6" not found in the index'), true);
+        });
+
+        it('subtree invalid; cycle created; rollback', () => {
+          /*
+           * before:
+           *    1
+           *    |
+           *    2 
+           *   / \
+           *  3   4
+           * 
+           *    2          2
+           *   / \  -->  /   \
+           *  3   4     3     1 <-- duplicate node (same as root) should trigger rollback
+           *
+           * after:
+           *    1
+           *    |
+           *    2 
+           *   / \
+           *  3   4
+           */
+          // before
+          assert.deepStrictEqual(bonsai.get('2').children, ['3', '4']);
+          // go
+          const subtree: any = [
+            { id: '2', children: ['3', '1'] }
+          ];
+          bonsai.transplant('2', subtree);
+          // assert.strictEqual(bonsai.transplant('2', subtree), false);
+          // after
+          assert.deepStrictEqual(bonsai.get('1').children, ['2']);
+          assert.deepStrictEqual(bonsai.get('2').children, ['3', '4']);
+          assert.strictEqual(fakeConsoleWarn.calledWith('node with id "1" already visited'), true);
         });
 
       });
 
       describe('prune()', () => {
 
-        it('leaf node; node exists; full path populated; no zombies', () => {
+        it('leaf node; node exists; parent exists', () => {
           /*
           *    1
           *    |
@@ -747,8 +798,7 @@ describe('tree', () => {
           *   / \
           *  3   4 <-- prune / remove
           */
-          // read as: remove node with id '4' via the path defined by node 'filename's with the given path ['one', 'two'].
-          assert.deepEqual(bonsai.prune('4', ['one', 'two'], 'filename'), true);
+          assert.deepEqual(bonsai.prune('2', '4'), true);
           // parent
           assert.deepEqual(bonsai.children('2'), ['3']);
           // (now orphaned) child
@@ -770,7 +820,7 @@ describe('tree', () => {
           });
         });
 
-        it('leaf node; node exists; full path populated; has zombies, parent', () => {
+        it('leaf node; node exists; parent exists; has zombie parent', () => {
           /*
           *    1
           *    |
@@ -791,7 +841,7 @@ describe('tree', () => {
           if (!fiveNode) { assert.fail(); }
           fourNode.children.push(zombieNode.id);
           zombieNode.children.push(fiveNode.id);
-          assert.deepEqual(bonsai.prune('5', ['one', 'two', 'four', 'braaains'], 'filename'), true);
+          assert.deepEqual(bonsai.prune('404', '5'), true);
           // parent
           assert.deepEqual(bonsai.children('404'), []);
           // (now orphaned) child
@@ -820,23 +870,21 @@ describe('tree', () => {
            *   / \
            *  3   4
            */
-          // read as: remove node with id '2' via the path defined by node 'filename's with the given path ['one', 'two'].
-          assert.deepEqual(bonsai.prune('2', ['one'], 'filename'), false);
+          assert.deepEqual(bonsai.prune('1', '2'), false);
           // parent
           assert.deepEqual(bonsai.children('1'), ['2']);
           // child
           assert.deepEqual(bonsai.lineage('2'), ['1', '3', '4']);
         });
 
-        it('error; root node', () => {
-          /*    1 <-- attempt prune / remove
+        it('error; self node', () => {
+          /*    1 <-- attempt prune / remove to self
            *    |
            *    2
            *   / \
            *  3   4
            */
-          // read as: remove node with id '2' via the path defined by node 'filename's with the given path ['one', 'two'].
-          assert.deepEqual(bonsai.prune('1', [], 'filename'), false);
+          assert.deepEqual(bonsai.prune('1', '1'), false);
           assert.deepEqual(bonsai.lineage('1'), ['2', '3', '4']);
         });
 
@@ -850,11 +898,115 @@ describe('tree', () => {
 
       });
 
+    });
+
+    describe('tree lvl', () => {
+
+      describe('flushRelFams()', () => {
+
+        it(NODE.TYPE.DEFAULT, () => {
+          // setup
+          const testNode1: Node | undefined = bonsai.get('1');
+          const testNode2: Node | undefined = bonsai.get('2');
+          // pretest
+          if (!testNode1) { assert.fail(); }
+          if (!testNode2) { assert.fail(); }
+          assert.deepEqual(testNode1.children, ['2']);
+          assert.deepEqual(testNode2.children, ['3', '4']);
+          // exec
+          assert.strictEqual(bonsai.flushRelFams(), true);
+          // test
+          assert.deepEqual(testNode1.children, []);
+          assert.deepEqual(testNode2.children, []);
+        });
+  
+      });
+
+      describe('isTree()', () => {
+
+        it('valid tree', () => {
+          assert.strictEqual(bonsai.isTree(), true);
+        });
+
+        it('valid tree; orphan nodes', () => {
+          // go
+          assert.strictEqual(bonsai.isTree(), true);
+          // after
+          const orphanNode: Node | undefined = bonsai.get('5');
+          assert.strictEqual(orphanNode !== undefined, true);
+          assert.strictEqual(bonsai.parent('5'), '');
+        });
+    
+        it('valid tree; larger tree', () => {
+          // before
+          for (let i = 6; i <= 20; i++) {
+            bonsai.add({
+              init: { id: i.toString() },
+              data: { uri: `file://data/${i}`, filename: `file${i}`, title: `Title ${i}` }
+            });
+            bonsai.graft((i-1).toString(), i.toString());
+          }
+          // go
+          assert.strictEqual(bonsai.isTree(), true);
+        });
+
+        it('invalid tree; empty tree', () => {
+          // before
+          const emptyBonsai = new Bonsai([], {});
+          // go
+          assert.strictEqual(emptyBonsai.isTree(), false);
+        });
+
+        it('invalid tree; cycle', () => {
+          const cyclicTree = new Bonsai([
+            { init: { id: '1' }, data: { filename: 'one' } },
+            { init: { id: '2' }, data: { filename: 'two' } },
+            { init: { id: '3' }, data: { filename: 'three' } },
+          ]);
+          cyclicTree.setRoot('1');
+          cyclicTree.graft('1', '2');
+          cyclicTree.graft('2', '3');
+          // create a cycle
+          cyclicTree.get('3')?.children.push('1');
+          // go
+          assert.strictEqual(cyclicTree.isTree(), false);
+          // after
+          assert.strictEqual(fakeConsoleWarn.calledWith('node with id "1" already visited'), true);
+        });
+    
+        it('invalid tree; duplicate nodes', () => {
+          const duplicateTree = new Bonsai([
+            { init: { id: '1' }, data: { filename: 'one' } },
+            { init: { id: '2' }, data: { filename: 'two' } },
+          ]);
+          duplicateTree.setRoot('1');
+          duplicateTree.graft('1', '2');
+          // add a duplicate reference
+          duplicateTree.get('1')?.children.push('2');
+          // go
+          assert.strictEqual(duplicateTree.isTree(), false);
+          // after
+          assert.strictEqual(fakeConsoleWarn.calledWith('node with id "2" already visited'), true);
+        });
+
+        it('invalid tree; missing nodes', () => {
+          const missingNodeTree = new Bonsai([
+            { init: { id: '1' }, data: { filename: 'one' } },
+          ]);
+          missingNodeTree.setRoot('1');
+          // add a non-existent node
+          missingNodeTree.get('1')?.children.push('2');
+          // go
+          assert.strictEqual(missingNodeTree.isTree(), false);
+          // after
+          assert.strictEqual(fakeConsoleWarn.calledWith('node with id "2" not found'), true);
+        });
+
+      });
+
       // todo
       // describe('printTree()', () => {
       // });
-
-      // todo: add methods to validate tree...?
 
     });
 

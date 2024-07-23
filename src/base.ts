@@ -219,7 +219,7 @@ export class Base {
     this.checkLock();
     // does id exist?
     if (data.id && this.has(data.id)) {
-      console.warn(`node with "id" "${data.id}" already exists`);
+      console.warn(`node with id "${data.id}" already exists`);
       return undefined;
     }
     // zombie-case
@@ -267,7 +267,7 @@ export class Base {
     this.checkLock();
     const node: Node | undefined = this.index[id];
     if (node === undefined) {
-      console.warn(`node with "id" "${id}" does not exist`);
+      console.warn(`node with id "${id}" does not exist`);
       return false;
     }
     if (key === QUERY_TYPE.NODETYPE) {
@@ -290,7 +290,7 @@ export class Base {
   public fill(id: string, data: BaseNodeData | any): Node | undefined {
     this.checkLock();
     if (!this.has(id) && !(data.id && this.has(data.id))) {
-      console.warn(`node with "id" "${id}" does not exist`);
+      console.warn(`node with id "${id}" does not exist`);
       return undefined;
     }
     if (!this.validate(data, id)) { return undefined; }
@@ -317,7 +317,7 @@ export class Base {
   public get(id: string, query: string | string[] = QUERY_TYPE.NODE): Node | any | undefined {
     this.checkLock();
     if (!this.index[id]) {
-      console.warn(`node with "id" "${id}" does not exist`);
+      console.warn(`node with id "${id}" does not exist`);
       return;
     }
     // single string query
@@ -400,7 +400,7 @@ export class Base {
     this.checkLock();
     const node: Node | undefined = this.get(id);
     if (!node) {
-      console.warn(`node with "id" "${id}" does not exist`);
+      console.warn(`node with id "${id}" does not exist`);
       return false;
     }
     const hasRel: boolean = this.all(QUERY_TYPE.NODE).some((node) => 

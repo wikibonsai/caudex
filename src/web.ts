@@ -365,8 +365,8 @@ export function Web<TBase extends Mixin>(Base: TBase) {
     // todo: disallow attribute add if (type === ''), or automatically set in links
     public connect(
       kind: REL.REF,
-      source: string,
-      target: string,
+      sourceID: string,
+      targetID: string,
       type: string = '',
     ): boolean {
       if (kind === REL.REF.REF) {
@@ -374,31 +374,36 @@ export function Web<TBase extends Mixin>(Base: TBase) {
         return false;
       }
       this.checkLock();
-      const sourceNode: Node | undefined = this.get(source);
-      if (!sourceNode || !this.has(target)) {
+      const sourceNode: Node | undefined = this.get(sourceID);
+      if (!sourceNode) {
+        console.warn(`source node with id "${sourceID}" not found`);
+        return false;
+      }
+      if (!this.has(targetID)) {
+        console.warn(`target node with id "${targetID}" not found`);
         return false;
       }
       if (kind === REL.REF.ATTR) {
         // create
         if (!Object.keys(sourceNode.attrs).includes(type)) {
-          sourceNode.attrs[type] = new Set([target]);
+          sourceNode.attrs[type] = new Set([targetID]);
         // add
         } else {
           // todo: sets or add counters
-          sourceNode.attrs[type].add(target);
+          sourceNode.attrs[type].add(targetID);
         }
-        if (sourceNode.attrs[type].has(target)) { return true; }
+        if (sourceNode.attrs[type].has(targetID)) { return true; }
       }
       if (kind === REL.REF.LINK) {
         const hasLink: Link | undefined = sourceNode.links.find((link: Link) => 
-          ((link.type === type) && (link.id === target))
+          ((link.type === type) && (link.id === targetID))
         );
         // create
         if (hasLink === undefined) {
           // todo: sets or add counters
           sourceNode.links.push({
             type: type,
-            id: target,
+            id: targetID,
           } as Link);
         }
         // todo: add if-check to verify it addition really succeeded
@@ -415,14 +420,14 @@ export function Web<TBase extends Mixin>(Base: TBase) {
           }
         }
         const hasEmbed: Embed | undefined = sourceNode.embeds.find((embed: Embed) => 
-          ((embed.media === type) && (embed.id === target))
+          ((embed.media === type) && (embed.id === targetID))
         );
         // create
         if (hasEmbed === undefined) {
           // todo: sets or add counters
           sourceNode.embeds.push({
             media: type,
-            id: target,
+            id: targetID,
           } as Embed);
         }
         // todo: add if-check to verify it addition really succeeded
@@ -462,15 +467,24 @@ export function Web<TBase extends Mixin>(Base: TBase) {
     }
 
     public transfer(
-      source: string,
-      target: string,
+      sourceID: string,
+      targetID: string,
       kind: REL.REF = REL.REF.REF,
-    ): Node | undefined {
+    ): boolean {
       this.checkLock();
-      const sourceNode: Node | undefined = this.get(source);
-      const targetNode: Node | undefined = this.get(target);
-      if (!sourceNode || !targetNode) {
-        return undefined;
+      if (sourceID === targetID) {
+        console.warn('source and target are the same');
+        return false;
+      }
+      const sourceNode: Node | undefined = this.get(sourceID);
+      const targetNode: Node | undefined = this.get(targetID);
+      if (!sourceNode) {
+        console.warn(`source node with id "${sourceID}" not in index`);
+        return false;
+      }
+      if (!targetNode) {
+        console.warn(`target node with id "${targetID}" not in index`);
+        return false;
       }
       if ((kind === REL.REF.REF) || (kind === REL.REF.ATTR)) {
         for (const [key, val] of Object.entries(sourceNode.attrs)) {
@@ -480,29 +494,29 @@ export function Web<TBase extends Mixin>(Base: TBase) {
           // add
           } else {
             val.forEach((v) => {
-              if (v !== target) { targetNode.attrs[key].add(v); } 
+              if (v !== targetID) { targetNode.attrs[key].add(v); } 
             });
           }
         }
         sourceNode.attrs = {} as Attrs;
       }
       if ((kind === REL.REF.REF) || (kind === REL.REF.LINK)) {
-        targetNode.links = targetNode.links.concat(sourceNode.links.filter((l) => l.id !== target));
+        targetNode.links = targetNode.links.concat(sourceNode.links.filter((l) => l.id !== targetID));
         sourceNode.links = [] as Links;
       }
       if ((kind === REL.REF.REF) || (kind === REL.REF.EMBED)) {
-        targetNode.embeds = targetNode.embeds.concat(sourceNode.embeds.filter((e) => e.id !== target));
+        targetNode.embeds = targetNode.embeds.concat(sourceNode.embeds.filter((e) => e.id !== targetID));
         sourceNode.embeds = [] as Embeds;
       }
-      return targetNode;
+      return true;
     }
 
     // remove
 
     public disconnect(
       kind: REL.REF,
-      source: string,
-      target: string,
+      sourceID: string,
+      targetID: string,
       type: string = '',
     ): boolean {
       if (kind === REL.REF.REF) {
@@ -510,8 +524,11 @@ export function Web<TBase extends Mixin>(Base: TBase) {
         return false;
       }
       this.checkLock();
-      const sourceNode: Node | undefined = this.get(source);
-      if (!sourceNode) { return false; }
+      const sourceNode: Node | undefined = this.get(sourceID);
+      if (!sourceNode) {
+        console.warn(`source node with id "${sourceID}" not found`);
+        return false;
+      }
       if (kind === REL.REF.ATTR) {
         // rm whole attr
         if (sourceNode.attrs[type].size === 1) {
@@ -519,20 +536,20 @@ export function Web<TBase extends Mixin>(Base: TBase) {
           if (!Object.keys(sourceNode.attrs).includes(type)) { return true; }
         // rm single id
         } else {
-          sourceNode.attrs[type].delete(target);
-          if (!sourceNode.attrs[type].has(target)) { return true; }
+          sourceNode.attrs[type].delete(targetID);
+          if (!sourceNode.attrs[type].has(targetID)) { return true; }
         }
       }
       if (kind === REL.REF.LINK) {
         for (let i = 0; i < sourceNode.links.length; i++) {
           // rm
-          if ((sourceNode.links[i].id === target)
+          if ((sourceNode.links[i].id === targetID)
           && (sourceNode.links[i].type === type)) {
             sourceNode.links.splice(i, 1);
           }
         }
         if (!sourceNode.links.find((link: Link) => 
-          (link.type === type) && (link.id === target))
+          (link.type === type) && (link.id === targetID))
         ) {
           return true;
         }
@@ -548,13 +565,13 @@ export function Web<TBase extends Mixin>(Base: TBase) {
         }
         for (let i = 0; i < sourceNode.embeds.length; i++) {
           // rm
-          if ((sourceNode.embeds[i].id === target)
+          if ((sourceNode.embeds[i].id === targetID)
           && (sourceNode.embeds[i].media === type)) {
             sourceNode.embeds.splice(i, 1);
           }
         }
         if (!sourceNode.embeds.find((embed: Embed) => 
-          (embed.media === type) && (embed.id === target))
+          (embed.media === type) && (embed.id === targetID))
         ) {
           return true;
         }

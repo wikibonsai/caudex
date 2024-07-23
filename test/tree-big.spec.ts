@@ -108,13 +108,13 @@ describe('big tree', () => {
      *  5  6 7  8
      */
     bonsai.setRoot('1');
-    bonsai.graft('2', ['one'], 'filename');
-    bonsai.graft('3', ['one', 'two'], 'filename');
-    bonsai.graft('4', ['one', 'two'], 'filename');
-    bonsai.graft('5', ['one', 'two', 'three'], 'filename');
-    bonsai.graft('6', ['one', 'two', 'three'], 'filename');
-    bonsai.graft('7', ['one', 'two', 'four'], 'filename');
-    bonsai.graft('8', ['one', 'two', 'four'], 'filename');
+    bonsai.graft('1', '2');
+    bonsai.graft('2', '3');
+    bonsai.graft('2', '4');
+    bonsai.graft('3', '5');
+    bonsai.graft('3', '6');
+    bonsai.graft('4', '7');
+    bonsai.graft('4', '8');
   });
 
   it('ancestors', () => {

@@ -963,7 +963,10 @@ describe('web', () => {
       describe('ref', () => {
 
         it('base; source and target both exist', () => {
-          const transferredNode: Node | undefined = wiki.transfer('1', '3');
+          // go
+          assert.strictEqual(wiki.transfer('1', '3'), true);
+          // after
+          const transferredNode: Node | undefined = wiki.get('3');
           if (!transferredNode) { assert.fail(); }
           // assert
           const sourceNode: Node | undefined = wiki.get('1');
@@ -989,7 +992,10 @@ describe('web', () => {
         });
 
         it('target cannot accept self refs', () => {
-          const transferredNode: Node | undefined = wiki.transfer('1', '2');
+          // go
+          assert.strictEqual(wiki.transfer('1', '2'), true);
+          // after
+          const transferredNode: Node | undefined = wiki.get('2');
           if (!transferredNode) { assert.fail(); }
           // assert
           const sourceNode: Node | undefined = wiki.get('1');
@@ -1007,11 +1013,11 @@ describe('web', () => {
         });
 
         it('source does not exist', () => {
-          assert.strictEqual(wiki.transfer('-1', '1'), undefined);
+          assert.strictEqual(wiki.transfer('-1', '1'), false);
         });
 
         it('target does not exist', () => {
-          assert.strictEqual(wiki.transfer('1', '-1'), undefined);
+          assert.strictEqual(wiki.transfer('1', '-1'), false);
         });
 
       });
@@ -1019,7 +1025,10 @@ describe('web', () => {
       describe('attr', () => {
 
         it('base; source and target both exist', () => {
-          const transferredNode: Node | undefined = wiki.transfer('1', '3', REL.REF.ATTR);
+          // go
+          assert.strictEqual(wiki.transfer('1', '3', REL.REF.ATTR), true);
+          // after
+          const transferredNode: Node | undefined = wiki.get('3');
           if (!transferredNode) { assert.fail(); }
           // assert
           const sourceNode: Node | undefined = wiki.get('1');
@@ -1045,11 +1054,11 @@ describe('web', () => {
         });
 
         it('source does not exist', () => {
-          assert.strictEqual(wiki.transfer('-1', '1', REL.REF.ATTR), undefined);
+          assert.strictEqual(wiki.transfer('-1', '1', REL.REF.ATTR), false);
         });
 
         it('target does not exist', () => {
-          assert.strictEqual(wiki.transfer('1', '-1', REL.REF.ATTR), undefined);
+          assert.strictEqual(wiki.transfer('1', '-1', REL.REF.ATTR), false);
         });
 
       });
@@ -1057,7 +1066,10 @@ describe('web', () => {
       describe('link', () => {
 
         it('base; source and target both exist', () => {
-          const transferredNode: Node | undefined = wiki.transfer('1', '3', REL.REF.LINK);
+          // go
+          assert.strictEqual(wiki.transfer('1', '3', REL.REF.LINK), true);
+          // after
+          const transferredNode: Node | undefined = wiki.get('3');
           if (!transferredNode) { assert.fail(); }
           // assert
           const sourceNode: Node | undefined = wiki.get('1');
@@ -1083,11 +1095,11 @@ describe('web', () => {
         });
 
         it('source does not exist', () => {
-          assert.strictEqual(wiki.transfer('-1', '1', REL.REF.LINK), undefined);
+          assert.strictEqual(wiki.transfer('-1', '1', REL.REF.LINK), false);
         });
 
         it('target does not exist', () => {
-          assert.strictEqual(wiki.transfer('1', '-1', REL.REF.LINK), undefined);
+          assert.strictEqual(wiki.transfer('1', '-1', REL.REF.LINK), false);
         });
 
       });
@@ -1095,7 +1107,10 @@ describe('web', () => {
       describe('embed', () => {
 
         it('base; source and target both exist', () => {
-          const transferredNode: Node | undefined = wiki.transfer('1', '3', REL.REF.EMBED);
+          // go
+          assert.strictEqual(wiki.transfer('1', '3', REL.REF.EMBED), true);
+          // after
+          const transferredNode: Node | undefined = wiki.get('3');
           if (!transferredNode) { assert.fail(); }
           // assert
           const sourceNode: Node | undefined = wiki.get('1');
@@ -1121,11 +1136,11 @@ describe('web', () => {
         });
 
         it('source does not exist', () => {
-          assert.strictEqual(wiki.transfer('-1', '1', REL.REF.EMBED), undefined);
+          assert.strictEqual(wiki.transfer('-1', '1', REL.REF.EMBED), false);
         });
 
         it('target does not exist', () => {
-          assert.strictEqual(wiki.transfer('1', '-1', REL.REF.EMBED), undefined);
+          assert.strictEqual(wiki.transfer('1', '-1', REL.REF.EMBED), false);
         });
 
       });
