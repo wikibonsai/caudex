@@ -364,9 +364,9 @@ export function Web<TBase extends Mixin>(Base: TBase) {
 
     // todo: disallow attribute add if (type === ''), or automatically set in links
     public connect(
-      kind: REL.REF,
       sourceID: string,
       targetID: string,
+      kind: REL.REF,
       type: string = '',
     ): boolean {
       if (kind === REL.REF.REF) {
@@ -514,9 +514,9 @@ export function Web<TBase extends Mixin>(Base: TBase) {
     // remove
 
     public disconnect(
-      kind: REL.REF,
       sourceID: string,
       targetID: string,
+      kind: REL.REF,
       type: string = '',
     ): boolean {
       if (kind === REL.REF.REF) {
@@ -527,6 +527,10 @@ export function Web<TBase extends Mixin>(Base: TBase) {
       const sourceNode: Node | undefined = this.get(sourceID);
       if (!sourceNode) {
         console.warn(`source node with id "${sourceID}" not found`);
+        return false;
+      }
+      if (!this.has(targetID)) {
+        console.warn(`target node with id "${targetID}" not found`);
         return false;
       }
       if (kind === REL.REF.ATTR) {
