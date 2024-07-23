@@ -1,6 +1,6 @@
 {
   "name": "caudex",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "An index/db for storing wiki-graph relationships -- and tree relationships!",
   "license": "GPL-3.0",
   "author": {
