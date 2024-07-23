@@ -318,9 +318,9 @@ Return an array of node ids for all neighbors / references.
 
 Flush / delete all reference relationships. If no id is given, flush all reference
 
-##### `connect(ref: REL.REF, source: string, target: string): boolean`
+##### `connect(source: string, target: string, ref: REL.REF, type: string = ''): boolean`
 
-Connect a `source` node id to a `target` node id via the given `ref` type (attr or link).
+Connect a `source` node id to a `target` node id via the given `ref` kind (`attr` or `link`) and `type` text.
 
 ##### `retype(oldType: string, newType: string[, type: REL.REF]): boolean`
 
@@ -328,9 +328,9 @@ Connect a `source` node id to a `target` node id via the given `ref` type (attr 
 
 Transfer the relationships from the `source` node to the `target` node via their IDs. Kind of relationships to transfer can be filtered by the `kind` var. Returns the target node on successful transfer.
 
-##### `disconnect(ref: REL.REF, source: string, target: string): boolean`
+##### `disconnect(source: string, target: string, ref: REL.REF, type: string = ''): boolean`
 
-Disconnect a `source` node id from a `target` node id of the given `ref` type (attr or link).
+Disconnect a `source` node id from a `target` node id of the given `ref` kind (`attr` or `link`) and `type` text.
 
 ## TODO
 

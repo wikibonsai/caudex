@@ -129,9 +129,9 @@ describe('web', () => {
       });
 
       it('index has no floaters', () => {
-        wiki.connect('link', '1', '2');
-        wiki.connect('link', '1', '3');
-        wiki.connect('link', '1', '4');
+        wiki.connect('1', '2', REL.REF.LINK, 'link');
+        wiki.connect('1', '3', REL.REF.LINK, 'link');
+        wiki.connect('1', '4', REL.REF.LINK, 'link');
         assert.deepEqual(wiki.floaters(), []);
       });
 
@@ -144,7 +144,7 @@ describe('web', () => {
     describe('foreattrs / backattrs', () => {
 
       it('node exists', () => {
-        // setup
+        // before
         wiki.index['1'].attrs['test'] = new Set(['2']);
         assert.deepEqual(wiki.foreattrs('1'), {
           'test': new Set(['2']),
@@ -160,7 +160,7 @@ describe('web', () => {
       });
 
       it('with query', () => {
-        // setup
+        // before
         wiki.index['1'].attrs['test'] = new Set(['2', '3']);
         assert.deepEqual(wiki.foreattrs('1', ['id', 'uri', 'filename']), {
           'test': [
@@ -197,7 +197,7 @@ describe('web', () => {
     describe('forelinks / backlinks', () => {
 
       it('node exists', () => {
-        // setup
+        // before
         wiki.index['1'].links.push({
           type: 'test',
           id: '2',
@@ -218,7 +218,7 @@ describe('web', () => {
       });
 
       it('with query', () => {
-        // setup
+        // before
         wiki.index['1'].links = [
           {
             type: 'test',
@@ -270,7 +270,7 @@ describe('web', () => {
     describe('foreembeds / backembeds', () => {
 
       it('node exists', () => {
-        // setup
+        // before
         wiki.index['1'].embeds.push({
           id: '2',
           media: NODE.MEDIA.MARKDOWN,
@@ -291,7 +291,7 @@ describe('web', () => {
       });
 
       it('with query', () => {
-        // setup
+        // before
         wiki.index['1'].embeds = [
           {
             id: '2',
@@ -337,14 +337,14 @@ describe('web', () => {
       // neighbors behavior identical for both 'attrs' and 'links'
 
       it('node exists; attr', () => {
-        // setup
+        // before
         wiki.index['1'].attrs['test'] = new Set(['2']);
         assert.deepEqual(wiki.neighbors('1'), ['2']);
         assert.deepEqual(wiki.neighbors('2'), ['1']);
       });
 
       it('node exists; link', () => {
-        // setup
+        // before
         wiki.index['1'].links.push({
           type: 'test',
           id: '2',
@@ -354,7 +354,7 @@ describe('web', () => {
       });
 
       it('node exists; embed', () => {
-        // setup
+        // before
         wiki.index['1'].embeds.push({
           id: '2',
           media: NODE.MEDIA.MARKDOWN,
@@ -364,7 +364,7 @@ describe('web', () => {
       });
 
       it('node exists; filter; attr', () => {
-        // setup
+        // before
         wiki.index['1'].attrs['test'] = new Set(['2']);
         wiki.index['1'].links.push({
           type: 'test',
@@ -381,7 +381,7 @@ describe('web', () => {
       });
 
       it('node exists; filter; link', () => {
-        // setup
+        // before
         wiki.index['1'].attrs['test'] = new Set(['2']);
         wiki.index['1'].links.push({
           type: 'test',
@@ -398,7 +398,7 @@ describe('web', () => {
       });
 
       it('node exists; filter; embed', () => {
-        // setup
+        // before
         wiki.index['1'].attrs['test'] = new Set(['2']);
         wiki.index['1'].links.push({
           type: 'test',
@@ -427,7 +427,7 @@ describe('web', () => {
     describe('flushRelRefs()', () => {
 
       it('all; flush refs; delete zombies with no refs', () => {
-        // setup
+        // before
         wiki.index['1'].attrs['test1'] = new Set(['2']);
         wiki.index['1'].links = [{
           type: NODE.TYPE.DEFAULT,
@@ -480,7 +480,7 @@ describe('web', () => {
       });
 
       it('single; node exists; flush refs; delete zombies with no refs', () => {
-        // setup
+        // before
         const zombie: Node | undefined = wiki.add('ima-zombie 🧟');
         if (!zombie) { assert.fail(); }
         wiki.index['1'].attrs['test'] = new Set(['2']);
@@ -513,7 +513,7 @@ describe('web', () => {
       });
 
       it('single; node exists; flush refs; do not delete zombies with refs', () => {
-        // setup
+        // before
         const zombie: Node | undefined = wiki.add('ima-zombie 🧟');
         if (!zombie) { assert.fail(); }
         wiki.index['1'].attrs['test'] = new Set(['2']);
@@ -559,7 +559,7 @@ describe('web', () => {
       });
 
       it('single; is zombie; is child; do not delete zombie', () => {
-        // setup
+        // before
         const zombie: Node | undefined = wiki.add('ima-zombie 🧟');
         if (!zombie) { assert.fail(); }
         wiki.index['1'].attrs['test'] = new Set(['2']);
@@ -615,7 +615,9 @@ describe('web', () => {
     describe('connect(); attribute', () => {
 
       it('create new', () => {
-        assert.deepEqual(wiki.connect(REL.REF.ATTR, '1', '2', 'test'), true);
+        // go
+        assert.strictEqual(wiki.connect('1', '2', REL.REF.ATTR, 'test'), true);
+        // after
         assert.deepEqual(wiki.foreattrs('1'), {
           'test': new Set(['2']),
         });
@@ -625,8 +627,10 @@ describe('web', () => {
       });
 
       it('append to type', () => {
-        assert.deepEqual(wiki.connect(REL.REF.ATTR, '1', '2', 'test'), true);
-        assert.deepEqual(wiki.connect(REL.REF.ATTR, '1', '3', 'test'), true);
+        // go
+        assert.strictEqual(wiki.connect('1', '2', REL.REF.ATTR, 'test'), true);
+        assert.strictEqual(wiki.connect('1', '3', REL.REF.ATTR, 'test'), true);
+        // after
         assert.deepEqual(wiki.foreattrs('1'), {
           'test': new Set(['2', '3']),
         });
@@ -639,12 +643,16 @@ describe('web', () => {
       });
 
       it('source node does not exist', () => {
-        assert.deepEqual(wiki.connect(REL.REF.ATTR, 'missing', '2', 'test'), false);
+        // go
+        assert.strictEqual(wiki.connect('missing', '2', REL.REF.ATTR, 'test'), false);
+        // after
         assert.deepEqual(wiki.backattrs('2'), {});
       });
 
       it('target node does not exist; create zombie node with data', () => {
-        assert.deepEqual(wiki.connect(REL.REF.ATTR, '1', 'missing', 'test'), false);
+        // go
+        assert.strictEqual(wiki.connect('1', 'missing', REL.REF.ATTR, 'test'), false);
+        // after
         assert.deepEqual(wiki.foreattrs('1'), {});
       });
 
@@ -653,7 +661,9 @@ describe('web', () => {
     describe('connect(); link', () => {
 
       it('untyped', () => {
-        assert.deepEqual(wiki.connect(REL.REF.LINK, '1', '2'), true);
+        // go
+        assert.strictEqual(wiki.connect('1', '2', REL.REF.LINK, ''), true);
+        // after
         assert.deepEqual(wiki.forelinks('1'), [{
           type: '',
           id: '2',
@@ -665,7 +675,9 @@ describe('web', () => {
       });
 
       it('typed', () => {
-        assert.deepEqual(wiki.connect(REL.REF.LINK, '1', '2', 'test'), true);
+        // go
+        assert.strictEqual(wiki.connect('1', '2', REL.REF.LINK, 'test'), true);
+        // after
         assert.deepEqual(wiki.forelinks('1'), [{
           type: 'test',
           id: '2',
@@ -677,8 +689,10 @@ describe('web', () => {
       });
 
       it('typed; multiples all saved', () => {
-        assert.deepEqual(wiki.connect(REL.REF.LINK, '1', '2', 'test'), true);
-        assert.deepEqual(wiki.connect(REL.REF.LINK, '1', '3', 'test'), true);
+        // go
+        assert.strictEqual(wiki.connect('1', '2', REL.REF.LINK, 'test'), true);
+        assert.strictEqual(wiki.connect('1', '3', REL.REF.LINK, 'test'), true);
+        // after
         assert.deepEqual(wiki.forelinks('1'), [{
           type: 'test',
           id: '2',
@@ -697,8 +711,10 @@ describe('web', () => {
       });
 
       it('typed; do not store duplicates', () => {
-        assert.deepEqual(wiki.connect(REL.REF.LINK, '1', '2', 'test'), true);
-        assert.deepEqual(wiki.connect(REL.REF.LINK, '1', '2', 'test'), true);
+        // go
+        assert.strictEqual(wiki.connect('1', '2', REL.REF.LINK, 'test'), true);
+        assert.strictEqual(wiki.connect('1', '2', REL.REF.LINK, 'test'), true);
+        // after
         assert.deepEqual(wiki.forelinks('1'), [{
           type: 'test',
           id: '2',
@@ -711,12 +727,16 @@ describe('web', () => {
       });
 
       it('source node does not exist', () => {
-        assert.deepEqual(wiki.connect(REL.REF.LINK, 'missing', '2', 'test'), false);
+        // go
+        assert.strictEqual(wiki.connect('missing', '2', REL.REF.LINK, 'test'), false);
+        // after
         assert.deepEqual(wiki.backlinks('2'), []);
       });
 
       it('target node does not exist', () => {
-        assert.deepEqual(wiki.connect(REL.REF.LINK, '1', 'missing', 'test'), false);
+        // go
+        assert.strictEqual(wiki.connect('1', 'missing', REL.REF.LINK, 'test'), false);
+        // after
         assert.deepEqual(wiki.forelinks('1'), []);
       });
 
@@ -731,7 +751,9 @@ describe('web', () => {
       it.skip('media kinds', () => { return; });
 
       it('base', () => {
-        assert.deepEqual(wiki.connect(REL.REF.EMBED, '1', '2'), true);
+        // go
+        assert.strictEqual(wiki.connect('1', '2', REL.REF.EMBED, NODE.MEDIA.MARKDOWN), true);
+        // after
         assert.deepEqual(wiki.foreembeds('1'), [{
           id: '2',
           media: NODE.MEDIA.MARKDOWN,
@@ -743,8 +765,10 @@ describe('web', () => {
       });
 
       it('multiples all saved', () => {
-        assert.deepEqual(wiki.connect(REL.REF.EMBED, '1', '2'), true);
-        assert.deepEqual(wiki.connect(REL.REF.EMBED, '1', '3'), true);
+        // go
+        assert.strictEqual(wiki.connect('1', '2', REL.REF.EMBED, NODE.MEDIA.MARKDOWN), true);
+        assert.strictEqual(wiki.connect('1', '3', REL.REF.EMBED, NODE.MEDIA.MARKDOWN), true);
+        // after
         assert.deepEqual(wiki.foreembeds('1'), [{
           id: '2',
           media: NODE.MEDIA.MARKDOWN,
@@ -763,8 +787,10 @@ describe('web', () => {
       });
 
       it('do not store duplicates', () => {
-        assert.deepEqual(wiki.connect(REL.REF.EMBED, '1', '2'), true);
-        assert.deepEqual(wiki.connect(REL.REF.EMBED, '1', '2'), true);
+        // go
+        assert.strictEqual(wiki.connect('1', '2', REL.REF.EMBED, NODE.MEDIA.MARKDOWN), true);
+        assert.strictEqual(wiki.connect('1', '2', REL.REF.EMBED, NODE.MEDIA.MARKDOWN), true);
+        // after
         assert.deepEqual(wiki.foreembeds('1'), [{
           id: '2',
           media: NODE.MEDIA.MARKDOWN,
@@ -777,12 +803,16 @@ describe('web', () => {
       });
 
       it('source node does not exist', () => {
-        assert.deepEqual(wiki.connect(REL.REF.EMBED, 'missing', '2'), false);
+        // go
+        assert.strictEqual(wiki.connect('missing', '2', REL.REF.EMBED, NODE.MEDIA.MARKDOWN), false);
+        // after
         assert.deepEqual(wiki.backembeds('2'), []);
       });
 
       it('target node does not exist', () => {
-        assert.deepEqual(wiki.connect(REL.REF.EMBED, '1', 'missing'), false);
+        // go
+        assert.strictEqual(wiki.connect('1', 'missing', REL.REF.EMBED, NODE.MEDIA.MARKDOWN), false);
+        // after
         assert.deepEqual(wiki.foreembeds('1'), []);
       });
 
@@ -791,7 +821,7 @@ describe('web', () => {
     describe('retype(); ref', () => {
 
       it('base; retypes both all ref kinds', () => {
-        // setup
+        // before
         wiki.index['1'].attrs['old-type'] = new Set(['2']);
         wiki.index['1'].links = [{
           type: 'old-type',
@@ -837,7 +867,7 @@ describe('web', () => {
     describe('retype(); attr', () => {
 
       it('base', () => {
-        // setup
+        // before
         wiki.index['1'].attrs['old-type'] = new Set(['2']);
         // before retype
         assert.deepEqual(wiki.foreattrs('1'), {
@@ -859,7 +889,7 @@ describe('web', () => {
       });
 
       it('does not retype links', () => {
-        // setup
+        // before
         wiki.index['1'].links = [{
           type: 'old-type',
           id: '2',
@@ -892,7 +922,7 @@ describe('web', () => {
     describe('retype(); link', () => {
 
       it('base', () => {
-        // setup
+        // before
         wiki.index['1'].links = [{
           type: 'old-type',
           id: '2',
@@ -921,7 +951,7 @@ describe('web', () => {
       });
 
       it('does not retype attrs', () => {
-        // setup
+        // before
         wiki.index['1'].attrs['old-type'] = new Set(['2']);
         // before retype
         assert.deepEqual(wiki.foreattrs('1'), {
@@ -1150,7 +1180,7 @@ describe('web', () => {
     describe('disconnect(); attribute', () => {
 
       it('base; rm whole attribute', () => {
-        // setup
+        // before
         wiki.index['1'].attrs['test'] = new Set(['2']);
         // before rm
         assert.deepEqual(wiki.foreattrs('1'), {
@@ -1160,14 +1190,14 @@ describe('web', () => {
           'test': new Set(['1']),
         });
         // rm
-        assert.deepEqual(wiki.disconnect(REL.REF.ATTR, '1', '2', 'test'), true);
+        assert.strictEqual(wiki.disconnect('1', '2', REL.REF.ATTR, 'test'), true);
         // after rm
         assert.deepEqual(wiki.foreattrs('1'), {});
         assert.deepEqual(wiki.backattrs('2'), {});
       });
 
       it('base; rm single id from attribute', () => {
-        // setup
+        // before
         wiki.index['1'].attrs['test'] = new Set(['2', '3']);
         // before rm
         assert.deepEqual(wiki.foreattrs('1'), {
@@ -1180,7 +1210,7 @@ describe('web', () => {
           'test': new Set(['1']),
         });
         // 
-        assert.deepEqual(wiki.disconnect(REL.REF.ATTR, '1', '2', 'test'), true);
+        assert.strictEqual(wiki.disconnect('1', '2', REL.REF.ATTR, 'test'), true);
         // after rm
         assert.deepEqual(wiki.foreattrs('1'), {
           'test': new Set(['3']),
@@ -1192,10 +1222,10 @@ describe('web', () => {
       });
 
       it('source node does not exist', () => {
-        // setup
+        // before
         wiki.index['1'].attrs['test'] = new Set(['2']);
         // rm
-        assert.deepEqual(wiki.disconnect(REL.REF.ATTR, 'missing', '2', 'test'), false);
+        assert.strictEqual(wiki.disconnect('missing', '2', REL.REF.ATTR, 'test'), false);
         assert.deepEqual(wiki.foreattrs('1'), {
           'test': new Set(['2']),
         });
@@ -1205,10 +1235,12 @@ describe('web', () => {
       });
 
       it('target node does not exist', () => {
-        // setup
+        // before
         wiki.index['1'].attrs['test'] = new Set(['2']);
         // rm
-        assert.deepEqual(wiki.disconnect('test', 'file://data/1', 'missing', 'uri'), false);
+        assert.strictEqual(wiki.disconnect('1', 'missing', REL.REF.ATTR, 'test'), false);
+        // after
+        assert.strictEqual(fakeConsoleWarn.getCall(0).args[0], 'target node with id "missing" not found');
         assert.deepEqual(wiki.foreattrs('1'), {
           'test': new Set(['2']),
         });
@@ -1222,7 +1254,7 @@ describe('web', () => {
     describe('disconnect(); link', () => {
 
       it('untyped (implicit)', () => {
-        // setup
+        // before
         wiki.index['1'].links = [{
           type: '',
           id: '2',
@@ -1237,14 +1269,14 @@ describe('web', () => {
           id: '1',
         }]);
         // rm
-        assert.deepEqual(wiki.disconnect(REL.REF.LINK, '1', '2'), true);
+        assert.strictEqual(wiki.disconnect('1', '2', REL.REF.LINK, ''), true);
         // after rm
         assert.deepEqual(wiki.forelinks('1'), []);
         assert.deepEqual(wiki.backlinks('2'), []);
       });
 
       it('untyped (explicit)', () => {
-        // setup
+        // before
         wiki.index['1'].links = [{
           type: '',
           id: '2',
@@ -1259,7 +1291,7 @@ describe('web', () => {
           id: '1',
         }]);
         // rm
-        assert.deepEqual(wiki.disconnect(REL.REF.LINK, '1', '2'), true);
+        assert.strictEqual(wiki.disconnect('1', '2', REL.REF.LINK, ''), true);
         // after rm
         assert.deepEqual(wiki.forelinks('1'), []);
         assert.deepEqual(wiki.backlinks('2'), []);
@@ -1268,7 +1300,7 @@ describe('web', () => {
       // todo: try to move a typed link without specifying the type
 
       it('typed', () => {
-        // setup
+        // before
         wiki.index['1'].links = [{
           type: 'test',
           id: '2',
@@ -1283,32 +1315,35 @@ describe('web', () => {
           id: '1',
         }]);
         // rm
-        assert.deepEqual(wiki.disconnect(REL.REF.LINK, '1', '2', 'test'), true);
+        assert.strictEqual(wiki.disconnect('1', '2', REL.REF.LINK, 'test'), true);
         // after rm
         assert.deepEqual(wiki.forelinks('1'), []);
         assert.deepEqual(wiki.backlinks('2'), []);
       });
 
       it('source node does not exist', () => {
-        // setup
+        // before
         wiki.index['1'].links = [{
           type: 'test',
           id: '2',
         }];
-        assert.deepEqual(wiki.disconnect(REL.REF.LINK, 'missing', '2', 'test'), false);
+        assert.strictEqual(wiki.disconnect('missing', '2', REL.REF.LINK, 'test'), false);
         assert.deepEqual(wiki.backlinks('2'), [{
           type: 'test',
           id: '1',
         }]);
       });
 
-      it('target node does not exist; returns true since target does not exist', () => {
-        // setup
+      it('target node does not exist', () => {
+        // before
         wiki.index['1'].links = [{
           type: 'test',
           id: '2',
         }];
-        assert.deepEqual(wiki.disconnect(REL.REF.LINK, '1', 'missing', 'test'), true);
+        // go
+        assert.strictEqual(wiki.disconnect('1', 'missing', REL.REF.LINK, 'test'), false);
+        // after
+        assert.strictEqual(fakeConsoleWarn.getCall(0).args[0], 'target node with id "missing" not found');
         assert.deepEqual(wiki.forelinks('1'), [{
           type: 'test',
           id: '2',
@@ -1320,7 +1355,7 @@ describe('web', () => {
     describe('disconnect(); embed', () => {
 
       it('base (implicit)', () => {
-        // setup
+        // before
         wiki.index['1'].embeds = [{
           media: NODE.MEDIA.MARKDOWN,
           id: '2',
@@ -1335,32 +1370,35 @@ describe('web', () => {
           id: '1',
         }]);
         // rm
-        assert.deepEqual(wiki.disconnect(REL.REF.EMBED, '1', '2'), true);
+        assert.strictEqual(wiki.disconnect('1', '2', REL.REF.EMBED, NODE.MEDIA.MARKDOWN), true);
         // after rm
         assert.deepEqual(wiki.foreembeds('1'), []);
         assert.deepEqual(wiki.backembeds('2'), []);
       });
 
       it('source node does not exist', () => {
-        // setup
+        // before
         wiki.index['1'].embeds = [{
           media: NODE.MEDIA.MARKDOWN,
           id: '2',
         }];
-        assert.deepEqual(wiki.disconnect(REL.REF.EMBED, 'missing', '2'), false);
+        assert.strictEqual(wiki.disconnect('missing', '2', REL.REF.EMBED, NODE.MEDIA.MARKDOWN), false);
         assert.deepEqual(wiki.backembeds('2'), [{
           media: NODE.MEDIA.MARKDOWN,
           id: '1',
         }]);
       });
 
-      it('target node does not exist; returns true since target does not exist', () => {
-        // setup
+      it('target node does not exist', () => {
+        // before
         wiki.index['1'].embeds = [{
           media: NODE.MEDIA.MARKDOWN,
           id: '2',
         }];
-        assert.deepEqual(wiki.disconnect(REL.REF.EMBED, '1', 'missing'), true);
+        // go
+        assert.strictEqual(wiki.disconnect('1', 'missing', REL.REF.EMBED, NODE.MEDIA.MARKDOWN), false);
+        // after
+        assert.strictEqual(fakeConsoleWarn.getCall(0).args[0], 'target node with id "missing" not found');
         assert.deepEqual(wiki.foreembeds('1'), [{
           media: NODE.MEDIA.MARKDOWN,
           id: '2',
