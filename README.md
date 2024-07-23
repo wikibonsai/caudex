@@ -234,19 +234,25 @@ Returns the numeric level of the target node.
 
 Flush / delete family relationships in the caudex.
 
-##### `graft(nodeID: string, path: any[], key: string): boolean`
+##### `graft(parentID: string, childID: string): boolean`
 
-Graft a node with the given `nodeID` onto the tree given the specified `path` where each step of the path is defined by the specified data `key` in each node; the `key` should be one of the caudex's `uniqKeys`.
+Graft a node with the given `childID` to another node with the given `parentID`.
+
+To perform subtree-sized changes, see [`transplant()`]().
 
 ##### `replace(source: string, target: string): Node | undefined`
 
 Replace a `source` node's position in the tree with the `target` node via their IDs. The updated target node is returned on success.
 
-##### `prune(nodeID: string, path: any[], key: string): boolean`
+##### `transplant(subrootID: string, subtree: { id: string, children: string[] }[]): boolean`
 
-Prune a node with the given `nodeID` from the tree given the specified `path` where each step is defined by the specified data `key` in each node; the `key` should be one of the caudex's `uniqKeys`.
+Replace a subtree in the tree with another subtree. This will return `true` if the subtree was successfully "transplanted" and the result was a valid tree. Otherwise, the original tree will be left alone and the function will return `false`.
 
-Note: As of the time of writing, it is more common to recreate the tree from scratch as opposed to individually pruning nodes, so more testing is neede don this method and probably only works on leaf nodes.
+##### `prune(parentID: string, childID: string): boolean`
+
+Prune a node with the given `childID` from another node with the given `parentID`. This method will fail if the node with the given `childID` has children.
+
+To perform subtree-sized changes, see [`transplant()`]().
 
 ##### `printTree()`
 

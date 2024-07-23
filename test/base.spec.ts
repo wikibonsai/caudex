@@ -374,7 +374,7 @@ describe('base', () => {
             title: 'Two',
           });
           assert.strictEqual(fakeConsoleWarn.called, true);
-          assert.strictEqual(fakeConsoleWarn.getCall(0).args[0], 'node with "id" "2" already exists');
+          assert.strictEqual(fakeConsoleWarn.getCall(0).args[0], 'node with id "2" already exists');
           assert.strictEqual(node, undefined);
           if (!base.uniqKeyMap) {
             console.error('\'uniqKeyMap\' undefined');
@@ -475,7 +475,7 @@ describe('base', () => {
         it('error; node does not exist', () => {
           assert.strictEqual(base.fill('-1', data), undefined);
           assert.strictEqual(fakeConsoleWarn.called, true);
-          assert.strictEqual(fakeConsoleWarn.getCall(0).args[0], 'node with "id" "-1" does not exist');
+          assert.strictEqual(fakeConsoleWarn.getCall(0).args[0], 'node with id "-1" does not exist');
         });
 
       });
@@ -500,7 +500,7 @@ describe('base', () => {
         it('single; node does not exist', () => {
           assert.strictEqual(base.flushData('-1'), false);
           assert.strictEqual(fakeConsoleWarn.called, true);
-          assert.strictEqual(fakeConsoleWarn.getCall(0).args[0], 'node with "id" "-1" does not exist');
+          assert.strictEqual(fakeConsoleWarn.getCall(0).args[0], 'node with id "-1" does not exist');
           // e.g. nothing removed
           assert.strictEqual(Object.keys(base.index).length, 2);
         });
@@ -589,7 +589,7 @@ describe('base', () => {
         it('node does not exist', () => {
           assert.strictEqual(base.get('-1'), undefined);
           assert.strictEqual(fakeConsoleWarn.called, true);
-          assert.strictEqual(fakeConsoleWarn.getCall(0).args[0], 'node with "id" "-1" does not exist');
+          assert.strictEqual(fakeConsoleWarn.getCall(0).args[0], 'node with id "-1" does not exist');
         });
 
         it('with query', () => {
@@ -883,7 +883,7 @@ describe('base', () => {
           assert.strictEqual(base.rm('-1'), false);
           // after
           assert.strictEqual(fakeConsoleWarn.called, true);
-          assert.strictEqual(fakeConsoleWarn.getCall(0).args[0], 'node with "id" "-1" does not exist');
+          assert.strictEqual(fakeConsoleWarn.getCall(0).args[0], 'node with id "-1" does not exist');
           assert.strictEqual(Object.keys(base.index).length, 2);
         });
 

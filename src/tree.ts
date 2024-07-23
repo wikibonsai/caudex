@@ -17,7 +17,7 @@ export function Tree<TBase extends Mixin>(Base: TBase) {
     public setRoot(id: string): boolean {
       this.checkLock();
       if (!this.has(id)) {
-        console.warn(`node with id ${id} not in index`);
+        console.warn(`node with id "${id}" not in index`);
         return false;
       }
       this._root = id;
@@ -278,118 +278,27 @@ export function Tree<TBase extends Mixin>(Base: TBase) {
 
     // add
 
-    // graft 'node' onto the tree based on the given 'path' where 
-    // each entry maps to a node's given data 'dataKey'.
-    // when to use:
-    //  - on tree initialization.
-    //  - a new file is created.
     // (this method is for all the asian pears out there 🍐)
-    // todo: is there a better way to validate node? (ex: top level node with no parent can't possibly be in tree, so why traverse whole tree?)
     public graft(
-      nodeID: string,
-      path: any[],
-      key: string,
+      parentID: string,
+      childID: string,
       curNode: Node = {} as Node,
       depth: number = 0,
     ): boolean {
       this.checkLock();
-      if (!this.has(nodeID)) { return false; }
-      let nextNode: Node | undefined;
-      let nextDepth: number;
-      // handle root and validation
-      if (depth === 0) {
-        const rootNode: Node | undefined = this.root(QUERY_TYPE.NODE);
-        if (rootNode === undefined) { console.warn('root undefined'); return false; }
-        curNode = rootNode;
-      }
-      // do not recurse forever
-      if (depth > path.length) {
-        console.warn('depth greater than given "path" size');
+      if (parentID === childID) {
+        console.warn('parentID and childID are the same');
         return false;
       }
-      nextNode = undefined;
-      // if parent reached -- graft / insert
-      if (depth === (path.length - 1)) {
-        if (!curNode.children.includes(nodeID)) {
-          curNode.children.push(nodeID);
-          // check if new tree structure is valid.
-          if (this.isTree()) {
-            return true;
-          // undo if invalid
-          } else {
-            curNode.children.pop();
-            return false;
-          }
-        } else {
-          return false;
-        }
-      // create zombie nodes along path if one does not exist
-      } else {
-        nextDepth = depth + 1;
-        // get node with the given description, regardless if it's listed as a child or not
-        nextNode = this.find(key, path[nextDepth]);
-        let nextNodeID: string | undefined = nextNode?.id;
-        if (nextNodeID === undefined) {
-          const zombieNode: Node | undefined = this.add(path[nextDepth]);
-          if (zombieNode === undefined) { return false; }
-          nextNodeID = zombieNode.id;
-          curNode.children.push(nextNodeID);
-          // to recurse
-          nextNode = this.get(nextNodeID);
-        }
+      if (!this.has(parentID)) {
+        console.warn(`parent node with id "${parentID}" not in index`);
+        return false;
       }
-      // recurse
-      return this.graft(nodeID, path, key, nextNode, nextDepth);
-    }
-
-    // edit
-
-    // replace the 'source' with the 'target', so in the end the 'target' is in the tree.
-    public replace(
-      source: string,
-      target: string,
-    ): Node | undefined {
-      this.checkLock();
-      const sourceNode: Node | undefined = this.get(source);
-      const targetNode: Node | undefined = this.get(target);
-      if (!sourceNode || !targetNode) {
-        return undefined;
+      if (!this.has(childID)) {
+        console.warn(`child node with id "${childID}" not in index`);
+        return false;
       }
-      // target already in tree
-      if ((this.parent(target) !== '') || (targetNode.children.length !== 0)) {
-        console.warn(`target with "id" "${target}" already exists in tree`);
-        return undefined;
-      }
-      // parent
-      const parentNode: Node | undefined = this.parent(source, QUERY_TYPE.NODE);
-      if (!parentNode) {
-        console.warn(`no parent exists for ${JSON.stringify(sourceNode)}`);
-        return undefined;
-      } else {
-        const sourceIndex: number= parentNode.children.indexOf(source);
-        parentNode.children[sourceIndex] = target;
-      }
-      // children
-      targetNode.children = sourceNode.children;
-      sourceNode.children = [];
-      return targetNode;
-    }
-
-    // rm
-
-    public prune(
-      nodeID: string,
-      path: any[],
-      key: string,
-      curNode: Node = {} as Node,
-      depth: number = 0,
-    ): boolean {
-      this.checkLock();
-      const doesNotExist: boolean = !this.has(nodeID);
-      const isRoot: boolean = (nodeID === this.root());
-      const hasChildren: boolean = (this.get(nodeID)?.children.length !== 0);
-      if (doesNotExist || isRoot || hasChildren) { return false; }
-      // handle root and validation
+      // handle root
       if (depth === 0) {
         const rootNode: Node | undefined = this.root(QUERY_TYPE.NODE);
         if (rootNode === undefined) {
@@ -398,86 +307,260 @@ export function Tree<TBase extends Mixin>(Base: TBase) {
         }
         curNode = rootNode;
       }
-      // if parent reached -- prune
-      if (depth === (path.length - 1)) {
-        const childIndex: number | undefined = curNode.children.findIndex((child: string) => child === nodeID);
-        curNode.children.splice(childIndex, 1);
+      // parent found
+      if (curNode.id === parentID) {
+        if (curNode.children.includes(childID)) {
+          return false;
+        }
+        curNode.children.push(childID);
+        if (!this.isTree()) {
+          curNode.children.pop();
+          return false;
+        }
         return true;
-      // create zombie nodes along path if one does not exist
-      } else {
-        const nextDepth: number = depth + 1;
-        const nextNodeID: string | undefined = curNode.children.find((child: string) => {
-          if (
-            (this.get(child)?.data[key] === path[nextDepth])
-            || ((key === this.zombieKey)
-            && (this.get(child)?.data['zombie'] === path[nextDepth]))
-          ) {
-            return child;
-          }
-        });
-        if (nextNodeID === undefined) { console.warn('invalid path'); return false; }
-        // recurse
-        const nextNode: Node | undefined = this.get(nextNodeID);
-        if (nextNode === undefined) { return false; }
-        return this.prune(nodeID, path, key, nextNode, nextDepth);
       }
+      // parent not found (yet)
+      for (const childNodeId of curNode.children) {
+        const childNode: Node | undefined = this.get(childNodeId);
+        if (childNode) {
+          if (childNode.id === childID) {
+            console.warn('child already exists');
+            return false;
+          }
+          if (this.graft(parentID, childID, childNode, depth + 1)) {
+            return true;
+          }
+        }
+      }
+      return false;
+    }
+
+    // edit
+
+    // replace the 'source' with the 'target', so in the end the 'target' is in the tree.
+    public replace(
+      sourceID: string,
+      targetID: string,
+    ): boolean {
+      this.checkLock();
+      if (sourceID === targetID) {
+        console.warn('source and target are the same');
+        return false;
+      }
+      const sourceNode: Node | undefined = this.get(sourceID);
+      const targetNode: Node | undefined = this.get(targetID);
+      if (!sourceNode) {
+        console.warn(`source node with id "${sourceID}" not in index`);
+        return false;
+      }
+      if (!targetNode) {
+        console.warn(`target node with id "${targetID}" not in index`);
+        return false;
+      }
+      // target already in tree
+      /* tsignore */
+      if ((this.parent(targetID) !== '') || (targetNode.children.length !== 0)) {
+        console.warn(`target with "id" "${targetID}" already exists in tree`);
+        return false;
+      }
+      // parent
+      const parentNode: Node | undefined = this.parent(sourceID, QUERY_TYPE.NODE);
+      if (!parentNode) {
+        console.warn(`no parent exists for ${JSON.stringify(sourceNode)}`);
+        return false;
+      } else {
+        const sourceIndex: number= parentNode.children.indexOf(sourceID);
+        parentNode.children[sourceIndex] = targetID;
+      }
+      // children
+      targetNode.children = sourceNode.children;
+      sourceNode.children = [];
+      return true;
+    }
+
+    // good for handling single index doc edits
+    // 'subrootID' should be included in the 'subtree' param
+    public transplant(
+      subrootID: string,
+      subtree: { id: string, children: string[] }[],
+    ): boolean {
+      if (!subtree.find(node => node.id === subrootID)) {
+        console.warn(`subroot with id "${subrootID}" not found in the subtree`);
+        return false;
+      }
+      this.checkLock();
+      const subrootNode: Node | undefined = this.get(subrootID);
+      if (!subrootNode) {
+        console.warn(`subroot with id "${subrootID}" not found in the index`);
+        return false;
+      }
+      const rollbackState: Map<string, { children: string[] }> = new Map();
+      const newSubtreeMap: Map<string, string[]> = new Map(subtree.map(node => [node.id, node.children]));
+      // perform changes
+      this.doTransplant(subrootID, newSubtreeMap, rollbackState);
+      // rollback if invalid tree or some other error
+      if (!this.isTree()) {
+        console.warn('transplant failed due to invalid resultant tree -- rolling back to previous state');
+        this.rollback(rollbackState);
+        return false;
+      }
+      return true;
+    }
+
+    private doTransplant(
+      nodeID: string,
+      newSubtreeMap: Map<string, string[]>,
+      rollbackState: Map<string, { children: string[] }>,
+    ): void {
+      const node: Node | undefined = this.get(nodeID);
+      if (!node) { return; }
+      // save state for possible rollback
+      rollbackState.set(nodeID, { children: [...node.children] });
+      const newChildIDs: string[] | undefined = newSubtreeMap.get(nodeID);
+      if (newChildIDs !== undefined) {
+        // update
+        node.children = newChildIDs;
+        this.index[nodeID] = node;
+        // recurse
+        node.children.forEach(childID => 
+          this.doTransplant(childID, newSubtreeMap, rollbackState)
+        );
+      }
+    }
+
+    // rollback for subtree transplants
+    private rollback(rollbackState: Map<string, { children: string[] }>): void {
+      for (const [nodeID, originalState] of rollbackState) {
+        const node: Node | undefined = this.get(nodeID);
+        if (node === undefined) {
+          console.warn(`node with id "${nodeID}" not found in the index when performing rollback`);
+          continue;
+        }
+        node.children = originalState.children;
+        this.index[nodeID] = node;
+      }
+    }
+
+    // rm
+
+    public prune(
+      parentID: string,
+      childID: string,
+      curNode: Node = {} as Node,
+      depth: number = 0
+    ): boolean {
+      this.checkLock();
+      if (parentID === childID) {
+        console.warn('parentID and childID are the same');
+        return false;
+      }
+      if (!this.has(parentID)) {
+        console.warn(`parent node with id "${parentID}" not in index`);
+        return false;
+      }
+      if (!this.has(childID)) {
+        console.warn(`child node with id "${childID}" not in index`);
+        return false;
+      }
+      // check if the node to be pruned is the root or has children
+      if (this.isRoot(childID) || !this.isLeaf(childID)) {
+        console.warn('cannot prune root or non-leaf child node');
+        return false;
+      }
+      // handle root
+      if (depth === 0) {
+        const rootNode: Node | undefined = this.root(QUERY_TYPE.NODE);
+        if (rootNode === undefined) {
+          console.warn('root undefined');
+          return false;
+        }
+        curNode = rootNode;
+      }
+      // parent found
+      if (curNode.id === parentID) {
+        const childIndex: number = curNode.children.indexOf(childID);
+        if (childIndex !== -1) {
+          curNode.children.splice(childIndex, 1);
+          return true;
+        } else {
+          return false; // Child not found in parent
+        }
+      }
+      // parent not found
+      for (const curChildID of curNode.children) {
+        const curChildNode: Node | undefined = this.get(curChildID);
+        if (curChildNode) {
+          if (this.prune(parentID, childID, curChildNode, depth + 1)) {
+            return true;
+          }
+        }
+      }
+      return false;
     }
 
     // tree utils
 
-    public isTree(
-      curNode: Node | undefined = {} as Node,
-      visited: Node[] = [],
-      depth: number = 0
-    ): boolean {
+    public isRoot(id: string): boolean {
       this.checkLock();
-      // handle root
-      if (depth === 0) {
-        curNode = this.root(QUERY_TYPE.NODE);
-        if (curNode === undefined) {
-          console.warn('root undefined');
-          return false;
-        }
-      }
-      // invalid
-      if (visited.includes(curNode)) {
-        return false;
-      }
-      // continue...
-      else {
-        visited.push(curNode);
-      }
-      const results: boolean[] = [];
-      for (const child of curNode.children) {
-        const nextNode: Node | undefined = this.get(child);
-        if (nextNode === undefined) {
-          console.warn(`node with id ${child} not found`);
-          return false;
-        }
-        results.concat(this.isTree(curNode, visited, depth + 1));
-      }
-      return results.every((r: boolean) => r);
+      return (id === this.root());
     }
 
-    public printTree(node: Node | undefined = this.root(QUERY_TYPE.NODE), depth: number = 0, result: string = ''): void {
+    public isLeaf(id: string): boolean {
       this.checkLock();
+      return (this.children(id)?.length === 0);
+    }
+
+    public isTree(
+      curNode: Node | undefined = this.root(QUERY_TYPE.NODE),
+      visited: Set<string> = new Set()
+    ): boolean {
+      this.checkLock();
+      if (curNode === undefined) {
+        console.warn('node is undefined');
+        return false;
+      }
+      if (visited.has(curNode.id)) {
+        console.warn(`node with id "${curNode.id}" already visited`);
+        return false;
+      }
+      visited.add(curNode.id);
+      for (const childId of curNode.children) {
+        const childNode = this.get(childId);
+        if (childNode === undefined) {
+          console.warn(`node with id "${childId}" not found`);
+          return false;
+        }
+        if (!this.isTree(childNode, visited)) {
+          return false;
+        }
+      }
+      return true;
+    }
+
+    // 'key' -- the data key to print
+    public printTree(key: string): void {
+      this.checkLock();
+      const node: Node | undefined = this.root(QUERY_TYPE.NODE);
       if (node === undefined) {
         throw new Error('root undefined');
       }
-      result += `\n\nLevel: ${depth}\nNode: ${JSON.stringify(node)};\nChildren: ${JSON.stringify(node.children)}`;
-      for (const child of node.children) {
-        this.printTree(this.get(child), depth + 1, result);
-      }
-      console.log(result);
+      console.log(this.buildTreeString(key, node));
     }
 
-    // public print(node: Node | undefined = this.root, depth: number = 0): void {
-    //   if (node === undefined) { throw new Error("root undefined"); };
-    //   console.log(`\n\nLevel: ${depth}\nNode: ${JSON.stringify(node)};\nChildren: ${JSON.stringify(node.children)}`);
-    //   for (let child of node.children) {
-    //     this.print(child, depth + 1);
-    //   }
-    // }
-
+    // for tree printing
+    private buildTreeString(key: string, node: Node, prefix: string = ''): string {
+      let result = `${prefix}${node.id}: ${JSON.stringify(node.data[key]) || 'Untitled'}\n`;
+      node.children.forEach((childID: string, index: number) => {
+        const childNode = this.get(childID);
+        if (childNode === undefined) {
+          return result;
+        }
+        const isLastChild = index === node.children.length - 1;
+        const childPrefix = prefix + (isLastChild ? '└── ' : '├── ');
+        // const grandchildPrefix = prefix + (isLastChild ? '    ' : '│   ');
+        result += this.buildTreeString(key, childNode, childPrefix);
+      });
+      return result;
+    }
   };
 }
