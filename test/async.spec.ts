@@ -68,7 +68,7 @@ describe('async mutex locking', () => {
     it('base', async () => {
       /* eslint-disable indent */
       const res: boolean | undefined = await locky.lock.acquire()
-                                                        .then((release) => {
+                                                       .then((release) => {
                                                           const hasNode: boolean = locky.has('1');
                                                           release();
                                                           return hasNode;

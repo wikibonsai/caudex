@@ -72,7 +72,23 @@ let opts = { thread: true };
 const caudex = new Caudex(fileData, opts);
 ```
 
-Then subsequent calls to `caudex` will use [mutex locks](https://github.com/DirtyHairy/async-mutex) to ensure atomic access to the internal index.
+Then subsequent calls to `caudex` will use [mutex locks](https://github.com/DirtyHairy/async-mutex) to ensure atomic access to the internal index. Remember to acquire the lock before performing actions on the caudex. For example, a call to [`has()`](https://github.com/wikibonsai/caudex?tab=readme-ov-file#hasid-string-boolean)...
+
+```ts
+// node with id '1'
+caudex.has('1');
+```
+
+...turns into:
+
+```ts
+caudex.lock.acquire()
+           .then((release) => { // node with id '1'
+                                const res: boolean = locky.has('1');
+                                release();
+                                return res;
+                              });
+```
 
 ## Terms
 
