@@ -302,7 +302,7 @@ export function Tree<TBase extends Mixin>(Base: TBase) {
         return false;
       }
       this.get(parentID, QUERY_TYPE.NODE).children.push(childID);
-      if (force || !this.isTree()) {
+      if (!force && !this.isTree()) {
         this.get(parentID, QUERY_TYPE.NODE).children.pop();
         return false;
       }
@@ -382,7 +382,7 @@ export function Tree<TBase extends Mixin>(Base: TBase) {
       return true;
     }
 
-    private doTransplant(
+    public doTransplant(
       nodeID: string,
       newSubtreeMap: Map<string, string[]>,
       rollbackState: Map<string, { children: string[] }>,
@@ -404,7 +404,7 @@ export function Tree<TBase extends Mixin>(Base: TBase) {
     }
 
     // rollback for subtree transplants
-    private rollback(rollbackState: Map<string, { children: string[] }>): void {
+    public rollback(rollbackState: Map<string, { children: string[] }>): void {
       for (const [nodeID, originalState] of rollbackState) {
         const node: Node | undefined = this.get(nodeID);
         if (node === undefined) {
@@ -450,7 +450,7 @@ export function Tree<TBase extends Mixin>(Base: TBase) {
       // Remove the child from the parent's children array
       parentNode.children.splice(childIndex, 1);
       // If the resulting structure is not a valid tree, revert the change
-      if (force || !this.isTree()) {
+      if (!force && !this.isTree()) {
         parentNode.children.push(childID);
         return false;
       }
@@ -515,7 +515,7 @@ export function Tree<TBase extends Mixin>(Base: TBase) {
     }
 
     // for tree printing
-    private buildTreeString(key: string, node: Node, prefix: string = ''): string {
+    public buildTreeString(key: string, node: Node, prefix: string = ''): string {
       let result = `${prefix}${node.id}: ${JSON.stringify(node.data[key]) || 'Untitled'}\n`;
       node.children.forEach((childID: string, index: number) => {
         const childNode = this.get(childID);
