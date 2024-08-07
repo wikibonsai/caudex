@@ -250,9 +250,9 @@ Returns the numeric level of the target node.
 
 Flush / delete family relationships in the caudex.
 
-##### `graft(parentID: string, childID: string): boolean`
+##### `graft(parentID: string, childID: string, force: boolean = false): boolean`
 
-Graft a node with the given `childID` to another node with the given `parentID`.
+Graft a node with the given `childID` to another node with the given `parentID`. Setting `force` to `true` will skip tree validation, which means the tree's structure won't be verified but grafting will complete faster.
 
 To perform subtree-sized changes, see [`transplant()`](https://github.com/wikibonsai/caudex/?tab=readme-ov-file#transplantsubrootid-string-subtree--id-string-children-string--boolean).
 
@@ -264,9 +264,9 @@ Replace a `source` node's position in the tree with the `target` node via their 
 
 Replace a subtree in the tree with another subtree. This will return `true` if the subtree was successfully "transplanted" and the result was a valid tree. Otherwise, the original tree will be left alone and the function will return `false`.
 
-##### `prune(parentID: string, childID: string): boolean`
+##### `prune(parentID: string, childID: string, force: boolean = false): boolean`
 
-Prune a node with the given `childID` from another node with the given `parentID`. This method will fail if the node with the given `childID` has children.
+Prune a node with the given `childID` from another node with the given `parentID`. This method will fail if the node with the given `childID` has children. Setting `force` to `true` will skip tree validation, which means the tree's structure won't be verified but grafting will complete faster.
 
 To perform subtree-sized changes, see [`transplant()`](https://github.com/wikibonsai/caudex/?tab=readme-ov-file#transplantsubrootid-string-subtree--id-string-children-string--boolean).
 
