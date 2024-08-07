@@ -282,8 +282,7 @@ export function Tree<TBase extends Mixin>(Base: TBase) {
     public graft(
       parentID: string,
       childID: string,
-      curNode: Node = {} as Node,
-      depth: number = 0,
+      force: boolean = false,
     ): boolean {
       this.checkLock();
       if (parentID === childID) {
@@ -298,41 +297,16 @@ export function Tree<TBase extends Mixin>(Base: TBase) {
         console.warn(`child node with id "${childID}" not in index`);
         return false;
       }
-      // handle root
-      if (depth === 0) {
-        const rootNode: Node | undefined = this.root(QUERY_TYPE.NODE);
-        if (rootNode === undefined) {
-          console.warn('root undefined');
-          return false;
-        }
-        curNode = rootNode;
+      if (this.inTree(childID)) {
+        console.warn(`child node with id "${childID}" already exists in the tree`);
+        return false;
       }
-      // parent found
-      if (curNode.id === parentID) {
-        if (curNode.children.includes(childID)) {
-          return false;
-        }
-        curNode.children.push(childID);
-        if (!this.isTree()) {
-          curNode.children.pop();
-          return false;
-        }
-        return true;
+      this.get(parentID, QUERY_TYPE.NODE).children.push(childID);
+      if (force || !this.isTree()) {
+        this.get(parentID, QUERY_TYPE.NODE).children.pop();
+        return false;
       }
-      // parent not found (yet)
-      for (const childNodeId of curNode.children) {
-        const childNode: Node | undefined = this.get(childNodeId);
-        if (childNode) {
-          if (childNode.id === childID) {
-            console.warn('child already exists');
-            return false;
-          }
-          if (this.graft(parentID, childID, childNode, depth + 1)) {
-            return true;
-          }
-        }
-      }
-      return false;
+      return true;
     }
 
     // edit
@@ -380,6 +354,7 @@ export function Tree<TBase extends Mixin>(Base: TBase) {
 
     // good for handling single index doc edits
     // 'subrootID' should be included in the 'subtree' param
+    // note: does not handle zombie creation
     public transplant(
       subrootID: string,
       subtree: { id: string, children: string[] }[],
@@ -446,8 +421,7 @@ export function Tree<TBase extends Mixin>(Base: TBase) {
     public prune(
       parentID: string,
       childID: string,
-      curNode: Node = {} as Node,
-      depth: number = 0
+      force: boolean = false,
     ): boolean {
       this.checkLock();
       if (parentID === childID) {
@@ -467,38 +441,31 @@ export function Tree<TBase extends Mixin>(Base: TBase) {
         console.warn('cannot prune root or non-leaf child node');
         return false;
       }
-      // handle root
-      if (depth === 0) {
-        const rootNode: Node | undefined = this.root(QUERY_TYPE.NODE);
-        if (rootNode === undefined) {
-          console.warn('root undefined');
-          return false;
-        }
-        curNode = rootNode;
+      const parentNode = this.get(parentID, QUERY_TYPE.NODE);
+      const childIndex = parentNode.children.indexOf(childID);
+      if (childIndex === -1) {
+        console.warn(`child node with id "${childID}" is not a child of parent "${parentID}"`);
+        return false;
       }
-      // parent found
-      if (curNode.id === parentID) {
-        const childIndex: number = curNode.children.indexOf(childID);
-        if (childIndex !== -1) {
-          curNode.children.splice(childIndex, 1);
-          return true;
-        } else {
-          return false; // Child not found in parent
-        }
+      // Remove the child from the parent's children array
+      parentNode.children.splice(childIndex, 1);
+      // If the resulting structure is not a valid tree, revert the change
+      if (force || !this.isTree()) {
+        parentNode.children.push(childID);
+        return false;
       }
-      // parent not found
-      for (const curChildID of curNode.children) {
-        const curChildNode: Node | undefined = this.get(curChildID);
-        if (curChildNode) {
-          if (this.prune(parentID, childID, curChildNode, depth + 1)) {
-            return true;
-          }
-        }
-      }
-      return false;
+      return true;
     }
 
     // tree utils
+
+    public inTree(id: string): boolean {
+      this.checkLock();
+      /* eslint-disable indent */
+      return (this.all(QUERY_TYPE.NODE)
+                  .find(node => node.children.includes(id)) !== undefined);
+      /* eslint-enable indent */
+    }
 
     public isRoot(id: string): boolean {
       this.checkLock();
