@@ -437,7 +437,7 @@ export function Tree<TBase extends Mixin>(Base: TBase) {
         return false;
       }
       // check if the node to be pruned is the root or has children
-      if (this.isRoot(childID) || !this.isLeaf(childID)) {
+      if (!force && (this.isRoot(childID) || !this.isLeaf(childID))) {
         console.warn('cannot prune root or non-leaf child node');
         return false;
       }
