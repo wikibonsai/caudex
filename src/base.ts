@@ -93,9 +93,12 @@ export class Base {
     return configdNanoid();
   }
 
-  public print() {
+  public print(printout: boolean = true): string {
     this.checkLock();
-    console.log(JSON.stringify(this.index));
+    if (printout) {
+      console.log(JSON.stringify(this.index));
+    }
+    return JSON.stringify(this.index);
   }
 
 

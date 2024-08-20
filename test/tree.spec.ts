@@ -1004,9 +1004,78 @@ describe('tree', () => {
 
       });
 
-      // todo
-      // describe('printTree()', () => {
-      // });
+      describe('printTree()', () => {
+
+        let consoleOutput: string;
+        let originalLog: (message?: any, ...optionalParams: any[]) => void;
+
+        beforeEach(() => {
+          originalLog = console.log;
+          consoleOutput = '';
+          console.log = (msg: string) => { consoleOutput += msg + '\n'; };
+        });
+
+        afterEach(() => {
+          // Restore the original console.log after each test
+          console.log = originalLog;
+        });
+
+        it('default', () => {
+          // setup
+          const treeBonsai = new Bonsai([
+            { init: { id: 'A' }, data: { title: 'Root' } },
+            { init: { id: 'B' }, data: { title: 'Child 1' } },
+            { init: { id: 'C' }, data: { title: 'Child 2' } },
+            { init: { id: 'D' }, data: { title: 'Grandchild 1' } },
+            { init: { id: 'E' }, data: { title: 'Grandchild 2' } },
+          ]);
+          treeBonsai.setRoot('A');
+          treeBonsai.graft('A', 'B');
+          treeBonsai.graft('A', 'C');
+          treeBonsai.graft('B', 'D');
+          treeBonsai.graft('B', 'E');
+          const expectedOutput = 
+            'A: "Root"\n' +
+            '├── B: "Child 1"\n' +
+            '│   ├── D: "Grandchild 1"\n' +
+            '│   └── E: "Grandchild 2"\n' +
+            '└── C: "Child 2"\n';
+          // go
+          const result = treeBonsai.printTree('title');
+          // assert
+          assert.strictEqual(result, expectedOutput);
+          assert.strictEqual(consoleOutput, expectedOutput + '\n');
+        });
+
+        it('missing data', () => {
+          // setup
+          const missingDataBonsai = new Bonsai([
+            { init: { id: 'A' }, data: { title: 'Root' } },
+            { init: { id: 'B' }, data: {} },  // Missing title
+            { init: { id: 'C' }, data: { title: 'Child 2' } },
+          ]);
+          missingDataBonsai.setRoot('A');
+          missingDataBonsai.graft('A', 'B');
+          missingDataBonsai.graft('A', 'C');
+          const expectedOutput = 
+          'A: "Root"\n' +
+          '├── B: node not found\n' +
+          '└── C: "Child 2"\n';
+          // go
+          const result = missingDataBonsai.printTree('title', false);  // Don't print to console
+          // assert
+          assert.strictEqual(result, expectedOutput);
+        });
+
+        it('error; root undefined', () => {
+          // go
+          const emptyBonsai = new Bonsai([]);
+          // assert
+          assert.throws(() => {
+            emptyBonsai.printTree('title');
+          }, Error, 'root undefined');
+        });
+      });
 
     });
 

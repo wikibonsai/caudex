@@ -505,27 +505,33 @@ export function Tree<TBase extends Mixin>(Base: TBase) {
     }
 
     // 'key' -- the data key to print
-    public printTree(key: string): void {
+    public printTree(key: string, printout: boolean = true): string {
       this.checkLock();
-      const node: Node | undefined = this.root(QUERY_TYPE.NODE);
-      if (node === undefined) {
+      const rootNode: Node | undefined = this.root(QUERY_TYPE.NODE);
+      if (rootNode === undefined) {
         throw new Error('root undefined');
       }
-      console.log(this.buildTreeString(key, node));
+      const treeStr: string = this.buildTreeString(key, rootNode, '', true);
+      if (printout) {
+        console.log(treeStr);
+      }
+      return treeStr;
     }
 
-    // for tree printing
-    public buildTreeString(key: string, node: Node, prefix: string = ''): string {
-      let result = `${prefix}${node.id}: ${JSON.stringify(node.data[key]) || 'Untitled'}\n`;
+    public buildTreeString(key: string, node: Node, prefix: string = '', isRoot: boolean = false): string {
+      let result = isRoot
+        ? `${node.id}: ${JSON.stringify(node.data[key]) || 'node not found'}\n`
+        : '';
       node.children.forEach((childID: string, index: number) => {
         const childNode = this.get(childID);
         if (childNode === undefined) {
-          return result;
+          return;
         }
-        const isLastChild = index === node.children.length - 1;
-        const childPrefix = prefix + (isLastChild ? '└── ' : '├── ');
-        // const grandchildPrefix = prefix + (isLastChild ? '    ' : '│   ');
-        result += this.buildTreeString(key, childNode, childPrefix);
+        const isLastChild: boolean = (index === node.children.length - 1);
+        const childPrefix: string = prefix + (isLastChild ? '└── ' : '├── ');
+        const grandchildPrefix: string = prefix + (isLastChild ? '    ' : '│   ');
+        const subtree: string = this.buildTreeString(key, childNode, grandchildPrefix);
+        result += childPrefix + `${childNode.id}: ${JSON.stringify(childNode.data[key]) || 'node not found'}\n` + subtree;
       });
       return result;
     }
