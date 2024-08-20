@@ -10,11 +10,11 @@ export function Web<TBase extends Mixin>(Base: TBase) {
 
     // nodes that are not linked to any other node in the web
     // types
-    floaters(query?: QUERY_TYPE.ID): string[] | undefined;
-    floaters(query: QUERY_TYPE.NODE): Node[] | undefined;
-    floaters(query: string | string[]): any[] | undefined;
+    isolates(query?: QUERY_TYPE.ID): string[] | undefined;
+    isolates(query: QUERY_TYPE.NODE): Node[] | undefined;
+    isolates(query: string | string[]): any[] | undefined;
     // define
-    floaters(query: string | string[] = QUERY_TYPE.ID): string[] | Node[] | any[] | undefined {
+    isolates(query: string | string[] = QUERY_TYPE.ID): string[] | Node[] | any[] | undefined {
       this.checkLock();
       /* eslint-disable indent */
       return this.all(QUERY_TYPE.NODE)

@@ -278,9 +278,9 @@ Print the tree to the console.
 
 #### Properties
 
-##### `floaters(): string[] | undefined`
+##### `isolates(): string[] | undefined`
 
-Returns all of the ids of floater nodes in the graph of the caudex.
+Returns all of the ids of isolated nodes (nodes not connected to the web) in the graph of the caudex.
 
 ##### `reftypes(): Set<string>`
 

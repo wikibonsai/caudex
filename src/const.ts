@@ -63,9 +63,9 @@ export namespace REL {
 
   // partial
   export enum PART {
-    ROGUE      = 'rogue',        // tree + web
+    DANGLER    = 'dangler',      // tree + web
     ORPHAN     = 'orphan',       // tree
-    FLOATER    = 'floater',      // web
+    ISOLATE    = 'isolate',      // web
   }
 
   // // level

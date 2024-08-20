@@ -122,21 +122,21 @@ describe('web', () => {
 
     });
 
-    describe('floaters', () => {
+    describe('isolates', () => {
 
-      it('index has floaters', () => {
-        assert.deepEqual(wiki.floaters(), ['1', '2', '3', '4']);
+      it('index has isolates', () => {
+        assert.deepEqual(wiki.isolates(), ['1', '2', '3', '4']);
       });
 
-      it('index has no floaters', () => {
+      it('index has no isolates', () => {
         wiki.connect('1', '2', REL.REF.LINK, 'link');
         wiki.connect('1', '3', REL.REF.LINK, 'link');
         wiki.connect('1', '4', REL.REF.LINK, 'link');
-        assert.deepEqual(wiki.floaters(), []);
+        assert.deepEqual(wiki.isolates(), []);
       });
 
       it('with query', () => {
-        assert.deepEqual(wiki.floaters('filename'), ['one', 'two', 'three', 'four']);
+        assert.deepEqual(wiki.isolates('filename'), ['one', 'two', 'three', 'four']);
       });
 
     });
