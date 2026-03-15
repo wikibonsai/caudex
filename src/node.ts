@@ -53,11 +53,15 @@ export class Node {
     return this.children.includes(id);
   }
 
-  public inLinks(id: string): boolean {
-    return this.links.filter((link: Link) => link.id === id).length !== 0;
+  public inLinks(id: string, header?: string): boolean {
+    return this.links.filter((link: Link) =>
+      link.id === id && (header === undefined || link.header === header)
+    ).length !== 0;
   }
 
-  public inEmbeds(id: string): boolean {
-    return this.embeds.filter((embed: Embed) => embed.id === id).length !== 0;
+  public inEmbeds(id: string, header?: string): boolean {
+    return this.embeds.filter((embed: Embed) =>
+      embed.id === id && (header === undefined || embed.header === header)
+    ).length !== 0;
   }
 }

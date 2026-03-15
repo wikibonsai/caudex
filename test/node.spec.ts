@@ -102,9 +102,31 @@ describe('node', () => {
       assert.strictEqual(node.inLinks('-1'), false);
     });
 
+    it('inLinks() with header', () => {
+      node.links = [
+        { id: '4', type: 'link-type' },
+        { id: '4', type: 'other', header: 'section-a' },
+      ];
+      assert.strictEqual(node.inLinks('4'), true);
+      assert.strictEqual(node.inLinks('4', 'section-a'), true);
+      assert.strictEqual(node.inLinks('4', 'other-section'), false);
+      assert.strictEqual(node.inLinks('4', undefined), true);
+    });
+
     it('inEmbeds()', () => {
       assert.strictEqual(node.inEmbeds('5'), true);
       assert.strictEqual(node.inEmbeds('-1'), false);
+    });
+
+    it('inEmbeds() with header', () => {
+      node.embeds = [
+        { id: '5', media: NODE.MEDIA.MARKDOWN },
+        { id: '5', media: NODE.MEDIA.MARKDOWN, header: 'intro' },
+      ];
+      assert.strictEqual(node.inEmbeds('5'), true);
+      assert.strictEqual(node.inEmbeds('5', 'intro'), true);
+      assert.strictEqual(node.inEmbeds('5', 'other'), false);
+      assert.strictEqual(node.inEmbeds('5', undefined), true);
     });
 
   });

@@ -1,4 +1,4 @@
-import { NODE } from './const';
+import { NODE, REL, QUERY_TYPE } from './const';
 import { Base } from './base';
 
 
@@ -24,6 +24,8 @@ export interface BaseNodeData {
   uri: string;
   filename: string;
   title: string;
+  headers: string[];
+  // blocks: string[];
 }
 
 // note:
@@ -50,13 +52,15 @@ export interface InitNode {
 export interface Link {
   id: string;
   type: string | undefined;
-  // level: 'file' | 'header' | 'block';
+  header?: string | undefined;
+  // block?: string | undefined;
   // label: boolean;
 }
 
 export interface Embed {
   id: string;
   media: NODE.MEDIA;
+  header?: string | undefined;
 }
 
 // collections
@@ -71,3 +75,38 @@ export interface Links extends Array<Link> {}
 
 /* eslint-disable-next-line @typescript-eslint/no-empty-interface */
 export interface Embeds extends Array<Embed> {}
+
+////
+// query system
+
+export interface FilterOpts {
+  level?: REL.LEVEL;
+  filename?: string;
+  header?: string;
+  kind?: REL.REF;
+  type?: string;
+  nodeKind?: NODE.KIND;
+  nodeType?: string;
+}
+
+export type PayloadOpt =
+  | QUERY_TYPE
+  | string
+  | string[];
+
+export interface QueryOpts {
+  filter?: FilterOpts;
+  payload?: PayloadOpt;
+}
+
+////
+// mutation options
+
+export interface ConnectOpts {
+  kind: REL.REF;
+  type?: string;
+  header?: string;
+  media?: NODE.MEDIA;
+}
+
+export type DisconnectOpts = ConnectOpts;

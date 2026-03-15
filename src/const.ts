@@ -68,12 +68,11 @@ export namespace REL {
     ISOLATE    = 'isolate',      // web
   }
 
-  // // level
-  // export enum LEVEL {
-  //   FILE        = 'file',
-  //   HEADER      = 'header',
-  //   BLOCK       = 'block',
-  // }
+  // ref level (file vs header targeting)
+  export enum LEVEL {
+    FILE    = 'file',
+    HEADER  = 'header',
+  }
 }
 
 export enum QUERY_TYPE {

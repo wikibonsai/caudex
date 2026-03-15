@@ -1,4 +1,4 @@
-import type { Mixin } from './types';
+import type { Mixin, PayloadOpt, QueryOpts } from './types';
 import { DATA_STRUCT, NODE, QUERY_TYPE, REL } from './const';
 import { Node } from './node';
 
@@ -36,118 +36,91 @@ export function Tree<TBase extends Mixin>(Base: TBase) {
 
     // tree-lvl
 
-    // types
-    root(query?: QUERY_TYPE.ID): string | undefined;
-    root(query: QUERY_TYPE.NODE): Node | undefined;
-    root(query: string | string[]): any | undefined;
-    // define
-    root(query: string | string[] = QUERY_TYPE.ID): string | Node | any | undefined {
+    root(opts?: QueryOpts | PayloadOpt): string | Node | any | undefined {
       this.checkLock();
       if (this._root === undefined) { return undefined; }
-      return this.get(this._root, query);
+      const queryOpts = (opts === undefined || typeof opts === 'string' || Array.isArray(opts)) ? { payload: opts ?? QUERY_TYPE.ID } : opts;
+      return this.get(this._root, queryOpts);
     }
 
-    // nodes that are not linked to any other node in the tree
-    // types
-    orphans(treeIDs: string[], query?: QUERY_TYPE.ID): string[] | undefined;
-    orphans(treeIDs: string[], query: QUERY_TYPE.NODE): Node[] | undefined;
-    orphans(treeIDs: string[], query: string | string[]): string[] | Node[] | any[] | undefined;
-    // define
-    orphans(treeIDs: string[], query: string | string[] = QUERY_TYPE.ID): Node[] | any[] | undefined {
+    orphans(treeIDs: string[], opts?: QueryOpts | PayloadOpt): string[] | Node[] | any[] | undefined {
       this.checkLock();
+      const queryOpts: QueryOpts = (opts === undefined || typeof opts === 'string' || Array.isArray(opts))
+        ? { payload: opts ?? QUERY_TYPE.ID }
+        : opts as QueryOpts;
+      const payload = queryOpts?.payload ?? QUERY_TYPE.ID;
       /* eslint-disable indent */
-      return this.all(QUERY_TYPE.NODE)
+      return (this.all({ ...queryOpts, payload: QUERY_TYPE.NODE }) as Node[] ?? [])
                  .filter((node: Node) =>
                     treeIDs.includes(node.id)
                     && (node.children.length === 0)
                     && !this.parent(node.id)
                     && (node.kind !== NODE.KIND.ZOMBIE)
                  ).map((node: Node) =>
-                   this.get(node.id, query)
+                   this.get(node.id, { ...queryOpts, payload })
                  );
       /* eslint-enable indent */
     }
 
-    // node-lvl
-
-    // types
-    ancestors(id: string, query?: QUERY_TYPE.ID): string[] | undefined;
-    ancestors(id: string, query: QUERY_TYPE.NODE): Node[] | undefined;
-    ancestors(id: string, query: string | string[]): any[] | undefined;
-    // define
-    ancestors(id: string, query: string | string[] = QUERY_TYPE.ID): string[] | Node[] | any[] | undefined {
+    ancestors(id: string, opts?: QueryOpts | PayloadOpt): string[] | Node[] | any[] | undefined {
       this.checkLock();
       if (!this.has(id)) { return undefined; }
       const ids: string[] = this.getRelFam(id, REL.FAM.ANCESTORS);
-      return (query === QUERY_TYPE.ID) ? ids : ids.map((id) => this.get(id, query));
+      const queryOpts = (opts === undefined || typeof opts === 'string' || Array.isArray(opts)) ? { payload: opts ?? QUERY_TYPE.ID } : opts;
+      const payload = queryOpts?.payload ?? QUERY_TYPE.ID;
+      return (payload === QUERY_TYPE.ID || payload === undefined) ? ids : ids.map((nodeId) => this.get(nodeId, { ...queryOpts, payload }));
     }
 
-    // types
-    parent(id: string, query?: QUERY_TYPE.ID): string | undefined;
-    parent(id: string, query: QUERY_TYPE.NODE): Node | undefined;
-    parent(id: string, query: string | string[]): any | undefined;
-    // define
-    parent(id: string, query: string | string[] = QUERY_TYPE.ID): string | any | undefined {
+    parent(id: string, opts?: QueryOpts | PayloadOpt): string | Node | any | undefined {
       this.checkLock();
       if (!this.has(id)) { return undefined; }
       const ids = this.getRelFam(id, REL.FAM.PARENT);
-      // no parent
       if (ids.length === 0) { return ''; }
-      return (query === QUERY_TYPE.ID) ? ids[0] : this.get(ids[0], query);
+      const queryOpts = (opts === undefined || typeof opts === 'string' || Array.isArray(opts)) ? { payload: opts ?? QUERY_TYPE.ID } : opts;
+      const payload = queryOpts?.payload ?? QUERY_TYPE.ID;
+      return (payload === QUERY_TYPE.ID || payload === undefined) ? ids[0] : this.get(ids[0], { ...queryOpts, payload });
     }
 
-    // types
-    siblings(id: string, query?: QUERY_TYPE.ID): string[] | undefined;
-    siblings(id: string, query: QUERY_TYPE.NODE): Node[] | undefined;
-    siblings(id: string, query: string | string[]): any[] | undefined;
-    // define
-    siblings(id: string, query: string | string[] = QUERY_TYPE.ID): string[] | any[] | undefined  {
+    siblings(id: string, opts?: QueryOpts | PayloadOpt): string[] | Node[] | any[] | undefined {
       this.checkLock();
       if (!this.has(id)) { return undefined; }
       const ids = this.getRelFam(id, REL.FAM.SIBLINGS);
-      return (query === QUERY_TYPE.ID) ? ids : ids.map((id) => this.get(id, query));
+      const queryOpts = (opts === undefined || typeof opts === 'string' || Array.isArray(opts)) ? { payload: opts ?? QUERY_TYPE.ID } : opts;
+      const payload = queryOpts?.payload ?? QUERY_TYPE.ID;
+      return (payload === QUERY_TYPE.ID || payload === undefined) ? ids : ids.map((nodeId) => this.get(nodeId, { ...queryOpts, payload }));
     }
 
-    // types
-    children(id: string, query?: QUERY_TYPE.ID): string[] | undefined;
-    children(id: string, query: QUERY_TYPE.NODE): Node[] | undefined;
-    children(id: string, query: string | string[]): any[] | undefined;
-    // define
-    children(id: string, query: string | string[] = QUERY_TYPE.ID): string[] | any[] | undefined  {
+    children(id: string, opts?: QueryOpts | PayloadOpt): string[] | Node[] | any[] | undefined {
       this.checkLock();
       if (!this.has(id)) { return undefined; }
       const ids = this.getRelFam(id, REL.FAM.CHILDREN);
-      return (query === QUERY_TYPE.ID) ? ids : ids.map((id) => this.get(id, query));
+      const queryOpts = (opts === undefined || typeof opts === 'string' || Array.isArray(opts)) ? { payload: opts ?? QUERY_TYPE.ID } : opts;
+      const payload = queryOpts?.payload ?? QUERY_TYPE.ID;
+      return (payload === QUERY_TYPE.ID || payload === undefined) ? ids : ids.map((nodeId) => this.get(nodeId, { ...queryOpts, payload }));
     }
 
-    // types
-    descendants(id: string, query?: QUERY_TYPE.ID): string[] | undefined;
-    descendants(id: string, query: QUERY_TYPE.NODE): Node[] | undefined;
-    descendants(id: string, query: string | string[]): any[] | undefined;
-    // define
-    descendants(id: string, query: string | string[] = QUERY_TYPE.ID): string[] | any | undefined  {
+    descendants(id: string, opts?: QueryOpts | PayloadOpt): string[] | Node[] | any[] | undefined {
       this.checkLock();
       if (!this.has(id)) { return undefined; }
       const ids = this.getRelFam(id, REL.FAM.DESCENDANTS);
-      return (query === QUERY_TYPE.ID) ? ids : ids.map((id) => this.get(id, query));
+      const queryOpts = (opts === undefined || typeof opts === 'string' || Array.isArray(opts)) ? { payload: opts ?? QUERY_TYPE.ID } : opts;
+      const payload = queryOpts?.payload ?? QUERY_TYPE.ID;
+      return (payload === QUERY_TYPE.ID || payload === undefined) ? ids : ids.map((nodeId) => this.get(nodeId, { ...queryOpts, payload }));
     }
 
-    // types
-    lineage(id: string, query?: QUERY_TYPE.ID): string[] | undefined;
-    lineage(id: string, query: QUERY_TYPE.NODE): Node[] | undefined;
-    lineage(id: string, query: string | string[]): any[] | undefined;
-    // define
-    lineage(id: string, query: string | string[] = QUERY_TYPE.ID): string[] | any | undefined  {
+    lineage(id: string, opts?: QueryOpts | PayloadOpt): string[] | Node[] | any[] | undefined {
       this.checkLock();
       if (!this.has(id)) { return undefined; }
       const ids = this.getRelFam(id, REL.FAM.LINEAGE);
-      return (query === QUERY_TYPE.ID) ? ids : ids.map((id) => this.get(id, query));
+      const queryOpts = (opts === undefined || typeof opts === 'string' || Array.isArray(opts)) ? { payload: opts ?? QUERY_TYPE.ID } : opts;
+      const payload = queryOpts?.payload ?? QUERY_TYPE.ID;
+      return (payload === QUERY_TYPE.ID || payload === undefined) ? ids : ids.map((nodeId) => this.get(nodeId, { ...queryOpts, payload }));
     }
 
     level(id: string): number | undefined  {
       this.checkLock();
       if (!this.has(id)) { return undefined; }
-      const ancestors: string[] | undefined = this.ancestors(id);
+      const ancestors = this.ancestors(id, { payload: QUERY_TYPE.ID }) as string[] | undefined;
       if (ancestors === undefined) { return undefined; }
       return ancestors.length;
     }
@@ -191,7 +164,7 @@ export function Tree<TBase extends Mixin>(Base: TBase) {
       this.checkLock();
       // handle root + init result info
       if (depth === 0) {
-        node = this.root(QUERY_TYPE.NODE);
+        node = this.root({ payload: QUERY_TYPE.NODE });
         if (node === undefined) { Error('root undefined'); return undefined; }
       }
       const atTargetNode: boolean = (nodeID === node.id);
@@ -211,7 +184,7 @@ export function Tree<TBase extends Mixin>(Base: TBase) {
         }
         if ((REL.FAM.DESCENDANTS in relData) || (REL.FAM.LINEAGE in relData)) {
           for (const child of node.children) {
-            const nextNode: Node | undefined = this.get(child);
+            const nextNode: Node | undefined = this.get(child, { payload: QUERY_TYPE.NODE });
             if (nextNode === undefined) { return undefined; }
             this.search(nodeID, relData, nextNode, depth + 1, true);
           }
@@ -228,7 +201,7 @@ export function Tree<TBase extends Mixin>(Base: TBase) {
         // if current node is the target's parent
         const targetNodeID: string | undefined = node.children.find((child: string) => child === nodeID);
         if (targetNodeID !== undefined) {
-          const targetNode = this.get(targetNodeID);
+          const targetNode = this.get(targetNodeID, { payload: QUERY_TYPE.NODE });
           if (targetNode === undefined) { return undefined; }
           if (REL.FAM.PARENT in relData) {
             relData['parent'] = [node.id];
@@ -241,7 +214,7 @@ export function Tree<TBase extends Mixin>(Base: TBase) {
         // keep searching
         } else {
           for (const child of node.children) {
-            const nextNode: Node | undefined = this.get(child);
+            const nextNode: Node | undefined = this.get(child, { payload: QUERY_TYPE.NODE });
             if (nextNode === undefined) { return undefined; }
             // there should only be one unique path, so return only that one result
             const result = this.search(nodeID, JSON.parse(JSON.stringify(relData)), nextNode, depth + 1);
@@ -255,10 +228,10 @@ export function Tree<TBase extends Mixin>(Base: TBase) {
 
     public flushRelFams(): boolean {
       this.checkLock();
-      for (const node of this.all(QUERY_TYPE.NODE)) {
+      for (const node of (this.all({ payload: QUERY_TYPE.NODE }) as Node[] ?? [])) {
         const isZombie: boolean = (node.kind === NODE.KIND.ZOMBIE);
         /* eslint-disable indent */
-        const hasRelRef: boolean = this.all(QUERY_TYPE.NODE).some((relNode) => 
+        const hasRelRef: boolean = (this.all({ payload: QUERY_TYPE.NODE }) as Node[] ?? []).some((relNode) => 
                                             (relNode.id !== node.id) 
                                             &&
                                             (relNode.inAttrs(node.id)
@@ -301,9 +274,9 @@ export function Tree<TBase extends Mixin>(Base: TBase) {
         console.warn(`child node with id "${childID}" already exists in the tree`);
         return false;
       }
-      this.get(parentID, QUERY_TYPE.NODE).children.push(childID);
+      this.get(parentID, { payload: QUERY_TYPE.NODE }).children.push(childID);
       if (!force && !this.isTree()) {
-        this.get(parentID, QUERY_TYPE.NODE).children.pop();
+        this.get(parentID, { payload: QUERY_TYPE.NODE }).children.pop();
         return false;
       }
       return true;
@@ -321,8 +294,8 @@ export function Tree<TBase extends Mixin>(Base: TBase) {
         console.warn('source and target are the same');
         return false;
       }
-      const sourceNode: Node | undefined = this.get(sourceID);
-      const targetNode: Node | undefined = this.get(targetID);
+      const sourceNode: Node | undefined = this.get(sourceID, { payload: QUERY_TYPE.NODE });
+      const targetNode: Node | undefined = this.get(targetID, { payload: QUERY_TYPE.NODE });
       if (!sourceNode) {
         console.warn(`source node with id "${sourceID}" not in index`);
         return false;
@@ -338,7 +311,7 @@ export function Tree<TBase extends Mixin>(Base: TBase) {
         return false;
       }
       // parent
-      const parentNode: Node | undefined = this.parent(sourceID, QUERY_TYPE.NODE);
+      const parentNode: Node | undefined = this.parent(sourceID, { payload: QUERY_TYPE.NODE });
       if (!parentNode) {
         console.warn(`no parent exists for ${JSON.stringify(sourceNode)}`);
         return false;
@@ -364,7 +337,7 @@ export function Tree<TBase extends Mixin>(Base: TBase) {
         return false;
       }
       this.checkLock();
-      const subrootNode: Node | undefined = this.get(subrootID);
+      const subrootNode: Node | undefined = this.get(subrootID, { payload: QUERY_TYPE.NODE });
       if (!subrootNode) {
         console.warn(`subroot with id "${subrootID}" not found in the index`);
         return false;
@@ -387,7 +360,7 @@ export function Tree<TBase extends Mixin>(Base: TBase) {
       newSubtreeMap: Map<string, string[]>,
       rollbackState: Map<string, { children: string[] }>,
     ): void {
-      const node: Node | undefined = this.get(nodeID);
+      const node: Node | undefined = this.get(nodeID, { payload: QUERY_TYPE.NODE });
       if (!node) { return; }
       // save state for possible rollback
       rollbackState.set(nodeID, { children: [...node.children] });
@@ -406,7 +379,7 @@ export function Tree<TBase extends Mixin>(Base: TBase) {
     // rollback for subtree transplants
     public rollback(rollbackState: Map<string, { children: string[] }>): void {
       for (const [nodeID, originalState] of rollbackState) {
-        const node: Node | undefined = this.get(nodeID);
+        const node: Node | undefined = this.get(nodeID, { payload: QUERY_TYPE.NODE });
         if (node === undefined) {
           console.warn(`node with id "${nodeID}" not found in the index when performing rollback`);
           continue;
@@ -441,7 +414,7 @@ export function Tree<TBase extends Mixin>(Base: TBase) {
         console.warn('cannot prune root or non-leaf child node');
         return false;
       }
-      const parentNode = this.get(parentID, QUERY_TYPE.NODE);
+      const parentNode = this.get(parentID, { payload: QUERY_TYPE.NODE });
       const childIndex = parentNode.children.indexOf(childID);
       if (childIndex === -1) {
         console.warn(`child node with id "${childID}" is not a child of parent "${parentID}"`);
@@ -462,7 +435,7 @@ export function Tree<TBase extends Mixin>(Base: TBase) {
     public inTree(id: string): boolean {
       this.checkLock();
       /* eslint-disable indent */
-      return (this.all(QUERY_TYPE.NODE)
+      return ((this.all({ payload: QUERY_TYPE.NODE }) as Node[] ?? [])
                   .find(node => node.children.includes(id)) !== undefined);
       /* eslint-enable indent */
     }
@@ -478,7 +451,7 @@ export function Tree<TBase extends Mixin>(Base: TBase) {
     }
 
     public isTree(
-      curNode: Node | undefined = this.root(QUERY_TYPE.NODE),
+      curNode: Node | undefined = this.root({ payload: QUERY_TYPE.NODE }),
       visited: Set<string> = new Set()
     ): boolean {
       this.checkLock();
@@ -492,7 +465,7 @@ export function Tree<TBase extends Mixin>(Base: TBase) {
       }
       visited.add(curNode.id);
       for (const childId of curNode.children) {
-        const childNode = this.get(childId);
+        const childNode = this.get(childId, { payload: QUERY_TYPE.NODE });
         if (childNode === undefined) {
           console.warn(`node with id "${childId}" not found`);
           return false;
@@ -507,7 +480,7 @@ export function Tree<TBase extends Mixin>(Base: TBase) {
     // 'key' -- the data key to print
     public printTree(key: string, printout: boolean = true): string {
       this.checkLock();
-      const rootNode: Node | undefined = this.root(QUERY_TYPE.NODE);
+      const rootNode: Node | undefined = this.root({ payload: QUERY_TYPE.NODE });
       if (rootNode === undefined) {
         throw new Error('root undefined');
       }
@@ -523,7 +496,7 @@ export function Tree<TBase extends Mixin>(Base: TBase) {
         ? `${node.id}: ${JSON.stringify(node.data[key]) || 'node not found'}\n`
         : '';
       node.children.forEach((childID: string, index: number) => {
-        const childNode = this.get(childID);
+        const childNode = this.get(childID, { payload: QUERY_TYPE.NODE });
         if (childNode === undefined) {
           return;
         }

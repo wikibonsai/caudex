@@ -7,6 +7,7 @@ export { Web } from './web';
 export { Tree } from './tree';
 export { Node } from './node';
 export * from './const';
+export type { FilterOpts, PayloadOpt, QueryOpts, ConnectOpts, DisconnectOpts } from './types';
 
 // export as 'static property mixin'
 // from: https://www.typescriptlang.org/docs/handbook/mixins.html#static-property-mixins-17829

@@ -5,6 +5,9 @@ import type {
   InitNodeType,
   BaseNodeData,
   CaudexOpts,
+  FilterOpts,
+  PayloadOpt,
+  QueryOpts,
 } from './types';
 import { NODE, QUERY_TYPE } from './const';
 import { Node } from './node';
@@ -21,6 +24,7 @@ export class Base {
   // key opts
   public uniqKeys: string[] = [];                                        // node data key that should be unique
   public zombieKey: string = '';                                         // node data key that should be unique across zombies too
+  public useHeaders: boolean = false;                                    // whether to include header links by default
   // async opts
   public useLock: boolean;                                               // whether index should be thread-safe
   public lock: Mutex;                                                    // the actual mutex lock
@@ -104,46 +108,67 @@ export class Base {
 
   // properties
 
+  protected applyFilter(nodes: Node[], filter?: FilterOpts): Node[] {
+    if (!filter) { return nodes; }
+    return nodes.filter((node: Node) => {
+      if (filter.nodeKind !== undefined && node.kind !== filter.nodeKind) { return false; }
+      if (filter.nodeType !== undefined && node.type !== filter.nodeType) { return false; }
+      if (filter.filename !== undefined && node.data?.filename !== filter.filename) { return false; }
+      return true;
+    });
+  }
 
-  // types
-  all(query?: QUERY_TYPE.ID): string[];
-  all(query: QUERY_TYPE.NODE): Node[];
-  all(query: string | string[]): any[] | undefined;
-  // define
-  all(query: string | string[] = QUERY_TYPE.ID): string[] | any[] | undefined {
+  protected resolvePayload(id: string, payload: PayloadOpt | undefined, node: Node | undefined): any {
+    const n = node ?? this.index[id];
+    if (!n && (payload === QUERY_TYPE.DATA || payload === QUERY_TYPE.NODEKIND || payload === QUERY_TYPE.NODETYPE || (typeof payload === 'string' && payload !== QUERY_TYPE.ID))) {
+      return undefined;
+    }
+    if (payload === undefined || payload === QUERY_TYPE.ID) { return id; }
+    if (payload === QUERY_TYPE.NODE) { return n; }
+    if (payload === QUERY_TYPE.NODEKIND) { return n?.kind; }
+    if (payload === QUERY_TYPE.NODETYPE) { return n?.type; }
+    if (payload === QUERY_TYPE.DATA) { return n?.data; }
+    if (payload === QUERY_TYPE.ZOMBIE) { return n?.data?.[this.zombieKey]; }
+    if (Array.isArray(payload)) {
+      const res: Record<string, any> = {};
+      for (const key of payload) {
+        res[key] = key in (n?.data ?? {}) ? n!.data[key] : this.execQuery(id, key);
+      }
+      return res;
+    }
+    if (Object.keys(n?.data ?? {}).includes(payload)) { return n!.data[payload]; }
+    return this.execQuery(id, payload);
+  }
+
+  all(opts?: QueryOpts | PayloadOpt): string[] | Node[] | any[] | undefined {
     this.checkLock();
-    if (query === QUERY_TYPE.ID)       { return Object.keys(this.index); }
-    if (query === QUERY_TYPE.NODE)     { return Object.values(this.index); }
-    if (query === QUERY_TYPE.NODEKIND) { return Object.values(this.index).map((node: Node) => node.kind); }
-    if (query === QUERY_TYPE.NODETYPE) { return Object.values(this.index).map((node: Node) => node.type); }
-    if (query === QUERY_TYPE.DATA)     { return Object.values(this.index).map((node: Node) => node.data); }
-    return Object.values(this.index).map((node: Node) => this.get(node.id, query));
+    const queryOpts: QueryOpts | undefined = (opts === undefined || typeof opts === 'string' || Array.isArray(opts))
+      ? { payload: opts ?? QUERY_TYPE.ID }
+      : opts;
+    const payload: PayloadOpt = queryOpts?.payload ?? QUERY_TYPE.ID;
+    let nodes: Node[] = Object.values(this.index);
+    nodes = this.applyFilter(nodes, queryOpts?.filter);
+    return nodes.map((node: Node) => this.resolvePayload(node.id, payload, node));
   }
 
   nodetypes(): Set<string> {
     this.checkLock();
     /* eslint-disable indent */
-    // @ts-expect-error: typescript is not smart enough to see 'filter' performing validation
-    const nodetypes: string[] = this.all(QUERY_TYPE.NODE)
-                                    .filter((node) => (node.type !== undefined) && (node.type !== ''))
-                                    .map((node) => node.type);
+    const nodes = (this.all({ payload: QUERY_TYPE.NODE }) as Node[] | undefined) ?? [];
+    const nodetypes: string[] = nodes
+      .filter((node) => (node.type !== undefined) && (node.type !== ''))
+      .map((node) => node.type as string);
     /* eslint-enable indent */
     return new Set(nodetypes);
   }
 
-  // nodes that contain only data other nodes are expecting to see
-  // types
-  zombies(query?: QUERY_TYPE.ID): string[];
-  zombies(query: QUERY_TYPE.NODE): Node[];
-  zombies(query: string | string[]): any[];
-  // define
-  zombies(query: QUERY_TYPE | string | string[] = QUERY_TYPE.ID): string[] | Node[] | any[] {
+  zombies(opts?: QueryOpts | PayloadOpt): string[] | Node[] | any[] | undefined {
     this.checkLock();
-    /* eslint-disable indent */
-    return this.all(QUERY_TYPE.NODE)
-               .filter((node: Node) => node.kind === NODE.KIND.ZOMBIE)
-               .map((node) => this.get(node.id, query));
-    /* eslint-enable indent */
+    const queryOpts: QueryOpts = (opts === undefined || typeof opts === 'string' || Array.isArray(opts))
+      ? { payload: opts ?? QUERY_TYPE.ID }
+      : opts as QueryOpts;
+    const mergedFilter = { ...queryOpts?.filter, nodeKind: NODE.KIND.ZOMBIE as NODE.KIND };
+    return this.all({ ...queryOpts, filter: mergedFilter });
   }
 
 
@@ -159,13 +184,13 @@ export class Base {
     this.checkLock();
     // single
     if (id) {
-      const node: Node | undefined = this.get(id);
+      const node: Node | undefined = this.get(id, { payload: QUERY_TYPE.NODE });
       if (node === undefined) { return false; }
       node.data = {};
       return true;
     // all
     } else {
-      this.all(QUERY_TYPE.NODE).forEach((node: Node) => {
+      (this.all({ payload: QUERY_TYPE.NODE }) as Node[] ?? []).forEach((node: Node) => {
         node.data = {};
       });
       return true;
@@ -174,7 +199,7 @@ export class Base {
 
   public flushRels(): boolean {
     this.checkLock();
-    for (const node of this.all(QUERY_TYPE.NODE)) {
+    for (const node of (this.all({ payload: QUERY_TYPE.NODE }) as Node[] ?? [])) {
       // delete zombies
       if (node.kind === NODE.KIND.ZOMBIE) {
         delete this.index[node.id];
@@ -217,7 +242,7 @@ export class Base {
   // add
 
   public add(data: BaseNodeData | any, init?: Partial<InitNodeType>): Node | undefined;  // default-case
-  public add(data: string): Node;                                              // zombie-case
+  public add(data: string): Node;                                                        // zombie-case
   public add(data: BaseNodeData | any, init?: Partial<InitNodeType>): Node | undefined {
     this.checkLock();
     // does id exist?
@@ -312,28 +337,17 @@ export class Base {
 
   // get
 
-  // types
-  public get(id: string): Node | undefined;
-  public get(id: string, query: QUERY_TYPE.NODE): Node;
-  public get(id: string, query: string | string[]): any | undefined;
-  // define
-  public get(id: string, query: string | string[] = QUERY_TYPE.NODE): Node | any | undefined {
+  public get(id: string, opts?: QueryOpts | PayloadOpt): Node | any | undefined {
     this.checkLock();
     if (!this.index[id]) {
       console.warn(`node with id "${id}" does not exist`);
-      return;
+      return undefined;
     }
-    // single string query
-    if (typeof query === 'string') {
-      return this.execQuery(id, query);
-    // multi array query
-    } else {
-      const res: any = {};
-      for (const q of query) {
-        res[q] = this.execQuery(id, q);
-      }
-      return res;
-    }
+    const queryOpts: QueryOpts | undefined = (opts === undefined || typeof opts === 'string' || Array.isArray(opts))
+      ? { payload: opts ?? QUERY_TYPE.NODE }
+      : opts;
+    const payload: PayloadOpt = queryOpts?.payload ?? QUERY_TYPE.NODE;
+    return this.resolvePayload(id, payload, this.index[id]);
   }
 
   public execQuery(id: string, qType: string): any {
@@ -346,6 +360,7 @@ export class Base {
       return this.index[id].kind;
     } else if (qType === QUERY_TYPE.NODETYPE) {
       return this.index[id].type;
+    // todo: make it possible to have a query type for dynamically defined data keys
     } else if (qType === QUERY_TYPE.DATA) {
       return this.index[id].data;
     } else if (qType === QUERY_TYPE.ZOMBIE) {
@@ -401,13 +416,13 @@ export class Base {
 
   public rm(id: string): boolean {
     this.checkLock();
-    const node: Node | undefined = this.get(id);
+    const node: Node | undefined = this.get(id, { payload: QUERY_TYPE.NODE });
     if (!node) {
       console.warn(`node with id "${id}" does not exist`);
       return false;
     }
-    const hasRel: boolean = this.all(QUERY_TYPE.NODE).some((node) => 
-      (node.id !== id) && (node.inChildren(id) || node.inAttrs(id) || node.inLinks(id))
+    const hasRel: boolean = (this.all({ payload: QUERY_TYPE.NODE }) as Node[] ?? []).some((n) =>
+      (n.id !== id) && (n.inChildren(id) || n.inAttrs(id) || n.inLinks(id))
     );
     // if other nodes reference this node, just delete data
     if (!hasRel) {

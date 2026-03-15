@@ -5,6 +5,7 @@ import nanoid from 'nanoid';
 
 import type { Attrs, Embeds, Links } from '../src/types';
 import { NODE, QUERY_TYPE, REL } from '../src/const';
+const { LEVEL } = REL;
 import { Node } from '../src/node';
 import { Base } from '../src/base';
 import { Web } from '../src/web';
@@ -159,6 +160,27 @@ describe('web', () => {
         assert.strictEqual(wiki.backattrs('-1'), undefined);
       });
 
+      it('filter.header throws', () => {
+        assert.throws(
+          () => wiki.foreattrs('1', { filter: { header: 'h1' } }),
+          /attrs do not support headers/
+        );
+      });
+
+      it('filter.level HEADER throws', () => {
+        assert.throws(
+          () => wiki.foreattrs('1', { filter: { level: LEVEL.HEADER } }),
+          /attrs do not support headers/
+        );
+      });
+
+      it('backattrs filter.header throws', () => {
+        assert.throws(
+          () => wiki.backattrs('2', { filter: { header: 'h1' } }),
+          /attrs do not support headers/
+        );
+      });
+
       it('with query', () => {
         // before
         wiki.index['1'].attrs['test'] = new Set(['2', '3']);
@@ -215,6 +237,40 @@ describe('web', () => {
       it('node does not exist', () => {
         assert.strictEqual(wiki.forelinks('-1'), undefined);
         assert.strictEqual(wiki.backlinks('-1'), undefined);
+      });
+
+      it('filter.level FILE returns only file-level links', () => {
+        wiki.connect('1', '2', { kind: REL.REF.LINK, type: 't' });
+        wiki.connect('1', '2', { kind: REL.REF.LINK, type: 't', header: 's1' });
+        wiki.connect('1', '2', { kind: REL.REF.LINK, type: 't', header: 's2' });
+        const out = wiki.forelinks('1', { filter: { level: LEVEL.FILE } });
+        assert.strictEqual(out.length, 1);
+        assert.strictEqual(out[0].header, undefined);
+      });
+
+      it('filter.level HEADER returns only header-level links', () => {
+        wiki.connect('1', '2', { kind: REL.REF.LINK, type: 't' });
+        wiki.connect('1', '2', { kind: REL.REF.LINK, type: 't', header: 's1' });
+        wiki.connect('1', '2', { kind: REL.REF.LINK, type: 't', header: 's2' });
+        const out = wiki.forelinks('1', { filter: { level: LEVEL.HEADER } });
+        assert.strictEqual(out.length, 2);
+        assert.strictEqual(out.every((l: any) => l.header), true);
+      });
+
+      it('filter.header returns only matching header', () => {
+        wiki.connect('1', '2', { kind: REL.REF.LINK, type: 't', header: 's1' });
+        wiki.connect('1', '2', { kind: REL.REF.LINK, type: 't', header: 's2' });
+        const out = wiki.forelinks('1', { filter: { header: 's1' } });
+        assert.strictEqual(out.length, 1);
+        assert.strictEqual(out[0].header, 's1');
+      });
+
+      it('backlinks filter.level FILE', () => {
+        wiki.connect('1', '2', { kind: REL.REF.LINK, type: 't' });
+        wiki.connect('1', '2', { kind: REL.REF.LINK, type: 't', header: 's1' });
+        const out = wiki.backlinks('2', { filter: { level: LEVEL.FILE } });
+        assert.strictEqual(out.length, 1);
+        assert.strictEqual(out[0].header, undefined);
       });
 
       it('with query', () => {
@@ -288,6 +344,31 @@ describe('web', () => {
       it('node does not exist', () => {
         assert.strictEqual(wiki.foreembeds('-1'), undefined);
         assert.strictEqual(wiki.backembeds('-1'), undefined);
+      });
+
+      it('filter.level FILE returns only file-level embeds', () => {
+        wiki.connect('1', '2', { kind: REL.REF.EMBED });
+        wiki.connect('1', '2', { kind: REL.REF.EMBED, header: 'a' });
+        wiki.connect('1', '2', { kind: REL.REF.EMBED, header: 'b' });
+        const out = wiki.foreembeds('1', { filter: { level: LEVEL.FILE } });
+        assert.strictEqual(out.length, 1);
+        assert.strictEqual(out[0].header, undefined);
+      });
+
+      it('filter.level HEADER returns only header-level embeds', () => {
+        wiki.connect('1', '2', { kind: REL.REF.EMBED });
+        wiki.connect('1', '2', { kind: REL.REF.EMBED, header: 'a' });
+        wiki.connect('1', '2', { kind: REL.REF.EMBED, header: 'b' });
+        const out = wiki.foreembeds('1', { filter: { level: LEVEL.HEADER } });
+        assert.strictEqual(out.length, 2);
+      });
+
+      it('filter.header returns only matching embed', () => {
+        wiki.connect('1', '2', { kind: REL.REF.EMBED, header: 'a' });
+        wiki.connect('1', '2', { kind: REL.REF.EMBED, header: 'b' });
+        const out = wiki.foreembeds('1', { filter: { header: 'a' } });
+        assert.strictEqual(out.length, 1);
+        assert.strictEqual(out[0].header, 'a');
       });
 
       it('with query', () => {
@@ -614,6 +695,13 @@ describe('web', () => {
 
     describe('connect(); attribute', () => {
 
+      it('connect with header throws', () => {
+        assert.throws(
+          () => wiki.connect('1', '2', { kind: REL.REF.ATTR, type: 't', header: 'h1' }),
+          /attrs do not support headers/
+        );
+      });
+
       it('create new', () => {
         // go
         assert.strictEqual(wiki.connect('1', '2', REL.REF.ATTR, 'test'), true);
@@ -740,6 +828,39 @@ describe('web', () => {
         assert.deepEqual(wiki.forelinks('1'), []);
       });
 
+      it('header; stores header on link', () => {
+        assert.strictEqual(wiki.connect('1', '2', { kind: REL.REF.LINK, type: 'test', header: 'section-a' }), true);
+        assert.deepEqual(wiki.forelinks('1'), [{
+          type: 'test',
+          id: '2',
+          header: 'section-a',
+        }]);
+        assert.deepEqual(wiki.backlinks('2'), [{
+          type: 'test',
+          header: 'section-a',
+          id: '1',
+        }]);
+      });
+
+      it('header; same target different headers are separate links', () => {
+        assert.strictEqual(wiki.connect('1', '2', { kind: REL.REF.LINK, type: 't', header: 'a' }), true);
+        assert.strictEqual(wiki.connect('1', '2', { kind: REL.REF.LINK, type: 't', header: 'b' }), true);
+        assert.strictEqual(wiki.forelinks('1').length, 2);
+        assert.deepEqual(wiki.forelinks('1'), [
+          { type: 't', id: '2', header: 'a' },
+          { type: 't', id: '2', header: 'b' },
+        ]);
+      });
+
+      it('header; file-level and header-level both stored', () => {
+        assert.strictEqual(wiki.connect('1', '2', { kind: REL.REF.LINK, type: 't' }), true);
+        assert.strictEqual(wiki.connect('1', '2', { kind: REL.REF.LINK, type: 't', header: 's1' }), true);
+        assert.strictEqual(wiki.forelinks('1').length, 2);
+        const links = wiki.forelinks('1');
+        assert.strictEqual(links.some((l: any) => !l.header), true);
+        assert.strictEqual(links.some((l: any) => l.header === 's1'), true);
+      });
+
     });
 
     describe('connect(); embed', () => {
@@ -814,6 +935,30 @@ describe('web', () => {
         assert.strictEqual(wiki.connect('1', 'missing', REL.REF.EMBED, NODE.MEDIA.MARKDOWN), false);
         // after
         assert.deepEqual(wiki.foreembeds('1'), []);
+      });
+
+      it('header; stores header on embed', () => {
+        assert.strictEqual(wiki.connect('1', '2', { kind: REL.REF.EMBED, header: 'intro' }), true);
+        assert.deepEqual(wiki.foreembeds('1'), [{
+          id: '2',
+          media: NODE.MEDIA.MARKDOWN,
+          header: 'intro',
+        }]);
+        assert.deepEqual(wiki.backembeds('2'), [{
+          id: '1',
+          media: NODE.MEDIA.MARKDOWN,
+          header: 'intro',
+        }]);
+      });
+
+      it('header; same target different headers are separate embeds', () => {
+        assert.strictEqual(wiki.connect('1', '2', { kind: REL.REF.EMBED, header: 'a' }), true);
+        assert.strictEqual(wiki.connect('1', '2', { kind: REL.REF.EMBED, header: 'b' }), true);
+        assert.strictEqual(wiki.foreembeds('1').length, 2);
+        assert.deepEqual(wiki.foreembeds('1'), [
+          { id: '2', media: NODE.MEDIA.MARKDOWN, header: 'a' },
+          { id: '2', media: NODE.MEDIA.MARKDOWN, header: 'b' },
+        ]);
       });
 
     });
@@ -1350,6 +1495,13 @@ describe('web', () => {
         }]);
       });
 
+      it('header; removes only the matching header link', () => {
+        wiki.connect('1', '2', { kind: REL.REF.LINK, type: 't', header: 'a' });
+        wiki.connect('1', '2', { kind: REL.REF.LINK, type: 't', header: 'b' });
+        assert.strictEqual(wiki.disconnect('1', '2', { kind: REL.REF.LINK, type: 't', header: 'a' }), true);
+        assert.deepEqual(wiki.forelinks('1'), [{ type: 't', id: '2', header: 'b' }]);
+      });
+
     });
 
     describe('disconnect(); embed', () => {
@@ -1403,6 +1555,13 @@ describe('web', () => {
           media: NODE.MEDIA.MARKDOWN,
           id: '2',
         }]);
+      });
+
+      it('header; removes only the matching header embed', () => {
+        wiki.connect('1', '2', { kind: REL.REF.EMBED, header: 'x' });
+        wiki.connect('1', '2', { kind: REL.REF.EMBED, header: 'y' });
+        assert.strictEqual(wiki.disconnect('1', '2', { kind: REL.REF.EMBED, header: 'x' }), true);
+        assert.deepEqual(wiki.foreembeds('1'), [{ id: '2', media: NODE.MEDIA.MARKDOWN, header: 'y' }]);
       });
 
     });
