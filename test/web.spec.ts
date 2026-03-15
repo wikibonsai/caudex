@@ -137,7 +137,7 @@ describe('web', () => {
       });
 
       it('with query', () => {
-        assert.deepEqual(wiki.isolates('filename'), ['one', 'two', 'three', 'four']);
+        assert.deepEqual(wiki.isolates({ payload: 'filename' }), ['one', 'two', 'three', 'four']);
       });
 
     });
@@ -184,7 +184,7 @@ describe('web', () => {
       it('with query', () => {
         // before
         wiki.index['1'].attrs['test'] = new Set(['2', '3']);
-        assert.deepEqual(wiki.foreattrs('1', ['id', 'uri', 'filename']), {
+        assert.deepEqual(wiki.foreattrs('1', { payload: ['id', 'uri', 'filename'] }), {
           'test': [
             {
               id: '2',
@@ -198,14 +198,14 @@ describe('web', () => {
             }
           ]
         });
-        assert.deepEqual(wiki.backattrs('2', ['id', 'uri', 'filename']), {
+        assert.deepEqual(wiki.backattrs('2', { payload: ['id', 'uri', 'filename'] }), {
           'test': [{
             id: '1',
             uri: 'file://data/1',
             filename: 'one',
           }]
         });
-        assert.deepEqual(wiki.backattrs('3', ['id', 'uri', 'filename']), {
+        assert.deepEqual(wiki.backattrs('3', { payload: ['id', 'uri', 'filename'] }), {
           'test': [{
             id: '1',
             uri: 'file://data/1',
@@ -285,7 +285,7 @@ describe('web', () => {
             id: '3',
           },
         ];
-        assert.deepEqual(wiki.forelinks('1', ['id', 'uri', 'filename']), [
+        assert.deepEqual(wiki.forelinks('1', { payload: ['id', 'uri', 'filename'] }), [
           [
             'test',
             {
@@ -303,7 +303,7 @@ describe('web', () => {
             },
           ]
         ]);
-        assert.deepEqual(wiki.backlinks('2', ['id', 'uri', 'filename']), [[
+        assert.deepEqual(wiki.backlinks('2', { payload: ['id', 'uri', 'filename'] }), [[
           'test',
           {
             id: '1',
@@ -311,7 +311,7 @@ describe('web', () => {
             filename: 'one',
           },
         ]]);
-        assert.deepEqual(wiki.backlinks('3', ['id', 'uri', 'filename']), [[
+        assert.deepEqual(wiki.backlinks('3', { payload: ['id', 'uri', 'filename'] }), [[
           'test',
           {
             id: '1',
@@ -383,7 +383,7 @@ describe('web', () => {
             media: NODE.MEDIA.MARKDOWN,
           },
         ];
-        assert.deepEqual(wiki.foreembeds('1', ['id', 'uri', 'filename']), [
+        assert.deepEqual(wiki.foreembeds('1', { payload: ['id', 'uri', 'filename'] }), [
           {
             id: '2',
             filename: 'two',
@@ -395,14 +395,14 @@ describe('web', () => {
             filename: 'three',
           },
         ]);
-        assert.deepEqual(wiki.backembeds('2', ['id', 'uri', 'filename']), [
+        assert.deepEqual(wiki.backembeds('2', { payload: ['id', 'uri', 'filename'] }), [
           {
             id: '1',
             uri: 'file://data/1',
             filename: 'one',
           },
         ]);
-        assert.deepEqual(wiki.backembeds('3', ['id', 'uri', 'filename']), [
+        assert.deepEqual(wiki.backembeds('3', { payload: ['id', 'uri', 'filename'] }), [
           {
             id: '1',
             uri: 'file://data/1',
@@ -625,7 +625,7 @@ describe('web', () => {
         // since the flushed node is the only one that references the zombie,
         // delete the zombie.
         assert.deepEqual(wiki.zombies().length, 1);
-        assert.deepEqual(wiki.zombies(QUERY_TYPE.NODE), [{
+        assert.deepEqual(wiki.zombies({ payload: QUERY_TYPE.NODE }), [{
           id: '404',
           kind: NODE.KIND.ZOMBIE,
           type: undefined,
@@ -673,7 +673,7 @@ describe('web', () => {
         // since the flushed node is the only one that references the zombie,
         // delete the zombie.
         assert.deepEqual(wiki.zombies().length, 1);
-        assert.deepEqual(wiki.zombies(QUERY_TYPE.NODE), [{
+        assert.deepEqual(wiki.zombies({ payload: QUERY_TYPE.NODE }), [{
           id: '404',
           kind: NODE.KIND.ZOMBIE,
           type: undefined,

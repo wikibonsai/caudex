@@ -124,11 +124,11 @@ describe('base', () => {
 
       it('all() / all(\'id\')', () => {
         assert.deepEqual(base.all(), ['1', '2']);
-        assert.deepEqual(base.all('id'), ['1', '2']);
+        assert.deepEqual(base.all({ payload: QUERY_TYPE.ID }), ['1', '2']);
       });
 
       it('all(\'node\')', () => {
-        assert.deepEqual(base.all('node'), [
+        assert.deepEqual(base.all({ payload: QUERY_TYPE.NODE }), [
           {
             id: '1',
             kind: NODE.KIND.DOC,
@@ -218,7 +218,7 @@ describe('base', () => {
 
       it('with query', () => {
         base.add('braaaains');
-        assert.deepEqual(base.zombies('node'), [{
+        assert.deepEqual(base.zombies({ payload: QUERY_TYPE.NODE }), [{
           id: '404',
           kind: NODE.KIND.ZOMBIE,
           type: undefined,
@@ -594,7 +594,7 @@ describe('base', () => {
 
         it('with query', () => {
           base.index['1'].attrs['test'] = new Set(['2', '3']);
-          assert.deepEqual(base.get('1', ['id', 'node', 'uri', 'filename']), {
+          assert.deepEqual(base.get('1', { payload: ['id', 'node', 'uri', 'filename'] }), {
             id: '1',
             node: {
               id: '1',

@@ -3,7 +3,7 @@ import sinon from 'sinon';
 
 import nanoid from 'nanoid';
 
-import { NODE } from '../src/const';
+import { NODE, QUERY_TYPE } from '../src/const';
 import { Node } from '../src/node';
 import { Base } from '../src/base';
 import { Tree } from '../src/tree';
@@ -164,16 +164,16 @@ describe('tree', () => {
     describe('orphans', () => {
 
       it('index has orphans', () => {
-        assert.deepEqual(bonsai.orphans(bonsai.all('id')), ['5']);
+        assert.deepEqual(bonsai.orphans(bonsai.all()), ['5']);
       });
 
       it('index has no orphans', () => {
         bonsai.rm('5');
-        assert.deepEqual(bonsai.orphans(bonsai.all('id')), []);
+        assert.deepEqual(bonsai.orphans(bonsai.all()), []);
       });
 
       it('with query', () => {
-        assert.deepEqual(bonsai.orphans(bonsai.all('id'), 'node'), [{
+        assert.deepEqual(bonsai.orphans(bonsai.all(), { payload: QUERY_TYPE.NODE }), [{
           id: '5',
           kind: NODE.KIND.DOC,
           type: NODE.TYPE.DEFAULT,
@@ -205,13 +205,13 @@ describe('tree', () => {
       });
 
       it('with query', () => {
-        assert.deepEqual(bonsai.ancestors('1', ['id', 'uri', 'filename']), []);
-        assert.deepEqual(bonsai.ancestors('2', ['id', 'uri', 'filename']), [{
+        assert.deepEqual(bonsai.ancestors('1', { payload: ['id', 'uri', 'filename'] }), []);
+        assert.deepEqual(bonsai.ancestors('2', { payload: ['id', 'uri', 'filename'] }), [{
           id: '1',
           uri: 'file://data/1',
           filename: 'one'
         }]);
-        assert.deepEqual(bonsai.ancestors('3', ['id', 'uri', 'filename']), [
+        assert.deepEqual(bonsai.ancestors('3', { payload: ['id', 'uri', 'filename'] }), [
           {
             id: '1',
             uri: 'file://data/1',
@@ -223,7 +223,7 @@ describe('tree', () => {
             filename: 'two',
           }
         ]);
-        assert.deepEqual(bonsai.ancestors('4', ['id', 'uri', 'filename']), [
+        assert.deepEqual(bonsai.ancestors('4', { payload: ['id', 'uri', 'filename'] }), [
           {
             id: '1',
             uri: 'file://data/1',
@@ -253,18 +253,18 @@ describe('tree', () => {
       });
 
       it('with query', () => {
-        assert.strictEqual(bonsai.parent('1', ['id', 'uri', 'filename']), '');
-        assert.deepEqual(bonsai.parent('2', ['id', 'uri', 'filename']), {
+        assert.strictEqual(bonsai.parent('1', { payload: ['id', 'uri', 'filename'] }), '');
+        assert.deepEqual(bonsai.parent('2', { payload: ['id', 'uri', 'filename'] }), {
           id: '1',
           uri: 'file://data/1',
           filename: 'one',
         });
-        assert.deepEqual(bonsai.parent('3', ['id', 'uri', 'filename']), {
+        assert.deepEqual(bonsai.parent('3', { payload: ['id', 'uri', 'filename'] }), {
           id: '2',
           uri: 'file://data/2',
           filename: 'two',
         });
-        assert.deepEqual(bonsai.parent('4', ['id', 'uri', 'filename']), {
+        assert.deepEqual(bonsai.parent('4', { payload: ['id', 'uri', 'filename'] }), {
           id: '2',
           uri: 'file://data/2',
           filename: 'two',
@@ -287,14 +287,14 @@ describe('tree', () => {
       });
 
       it('with query', () => {
-        assert.deepEqual(bonsai.siblings('1', ['id', 'uri', 'filename']), []);
-        assert.deepEqual(bonsai.siblings('2', ['id', 'uri', 'filename']), []);
-        assert.deepEqual(bonsai.siblings('3', ['id', 'uri', 'filename']), [{
+        assert.deepEqual(bonsai.siblings('1', { payload: ['id', 'uri', 'filename'] }), []);
+        assert.deepEqual(bonsai.siblings('2', { payload: ['id', 'uri', 'filename'] }), []);
+        assert.deepEqual(bonsai.siblings('3', { payload: ['id', 'uri', 'filename'] }), [{
           id: '4',
           uri: 'file://data/4',
           filename: 'four',
         }]);
-        assert.deepEqual(bonsai.siblings('4', ['id', 'uri', 'filename']), [{
+        assert.deepEqual(bonsai.siblings('4', { payload: ['id', 'uri', 'filename'] }), [{
           id: '3',
           uri: 'file://data/3',
           filename: 'three',
@@ -317,12 +317,12 @@ describe('tree', () => {
       });
 
       it('with query', () => {
-        assert.deepEqual(bonsai.children('1', ['id', 'uri', 'filename']), [{
+        assert.deepEqual(bonsai.children('1', { payload: ['id', 'uri', 'filename'] }), [{
           id: '2',
           uri: 'file://data/2',
           filename: 'two',
         }]);
-        assert.deepEqual(bonsai.children('2', ['id', 'uri', 'filename']), [
+        assert.deepEqual(bonsai.children('2', { payload: ['id', 'uri', 'filename'] }), [
           {
             id: '3',
             uri: 'file://data/3',
@@ -334,8 +334,8 @@ describe('tree', () => {
             filename: 'four',
           }
         ]);
-        assert.deepEqual(bonsai.children('3', ['id', 'uri', 'filename']), []);
-        assert.deepEqual(bonsai.children('4', ['id', 'uri', 'filename']), []);
+        assert.deepEqual(bonsai.children('3', { payload: ['id', 'uri', 'filename'] }), []);
+        assert.deepEqual(bonsai.children('4', { payload: ['id', 'uri', 'filename'] }), []);
       });
 
     });
@@ -354,7 +354,7 @@ describe('tree', () => {
       });
 
       it('node exists; ordered children to leaf', () => {
-        assert.deepEqual(bonsai.descendants('1', ['id', 'uri', 'filename']), [
+        assert.deepEqual(bonsai.descendants('1', { payload: ['id', 'uri', 'filename'] }), [
           {
             id: '2',
             uri: 'file://data/2',
@@ -371,7 +371,7 @@ describe('tree', () => {
             filename: 'four',
           }
         ]);
-        assert.deepEqual(bonsai.descendants('2', ['id', 'uri', 'filename']), [
+        assert.deepEqual(bonsai.descendants('2', { payload: ['id', 'uri', 'filename'] }), [
           {
             id: '3',
             uri: 'file://data/3',
@@ -383,8 +383,8 @@ describe('tree', () => {
             filename: 'four',
           }
         ]);
-        assert.deepEqual(bonsai.descendants('3', ['id', 'uri', 'filename']), []);
-        assert.deepEqual(bonsai.descendants('4', ['id', 'uri', 'filename']), []);
+        assert.deepEqual(bonsai.descendants('3', { payload: ['id', 'uri', 'filename'] }), []);
+        assert.deepEqual(bonsai.descendants('4', { payload: ['id', 'uri', 'filename'] }), []);
       });
 
     });
@@ -403,7 +403,7 @@ describe('tree', () => {
       });
 
       it('with query', () => {
-        assert.deepEqual(bonsai.lineage('1', ['id', 'uri', 'filename']), [
+        assert.deepEqual(bonsai.lineage('1', { payload: ['id', 'uri', 'filename'] }), [
           {
             id: '2',
             uri: 'file://data/2',
@@ -420,7 +420,7 @@ describe('tree', () => {
             filename: 'four',
           }
         ]);
-        assert.deepEqual(bonsai.lineage('2', ['id', 'uri', 'filename']), [
+        assert.deepEqual(bonsai.lineage('2', { payload: ['id', 'uri', 'filename'] }), [
           {
             id: '1',
             uri: 'file://data/1',
@@ -437,7 +437,7 @@ describe('tree', () => {
             filename: 'four',
           }
         ]);
-        assert.deepEqual(bonsai.lineage('3', ['id', 'uri', 'filename']), [
+        assert.deepEqual(bonsai.lineage('3', { payload: ['id', 'uri', 'filename'] }), [
           {
             id: '1',
             uri: 'file://data/1',
@@ -449,7 +449,7 @@ describe('tree', () => {
             filename: 'two',
           },
         ]);
-        assert.deepEqual(bonsai.lineage('4', ['id', 'uri', 'filename']), [
+        assert.deepEqual(bonsai.lineage('4', { payload: ['id', 'uri', 'filename'] }), [
           {
             id: '1',
             uri: 'file://data/1',
@@ -502,7 +502,7 @@ describe('tree', () => {
 
         it('root set', () => {
           assert.deepEqual(bonsai.root(), '1');
-          assert.deepEqual(bonsai.root('node'), {
+          assert.deepEqual(bonsai.root({ payload: QUERY_TYPE.NODE }), {
             id: '1',
             kind: NODE.KIND.DOC,
             type: NODE.TYPE.DEFAULT,

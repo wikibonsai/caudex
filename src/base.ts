@@ -140,14 +140,11 @@ export class Base {
     return this.execQuery(id, payload);
   }
 
-  all(opts?: QueryOpts | PayloadOpt): string[] | Node[] | any[] | undefined {
+  all(opts?: QueryOpts): string[] | Node[] | any[] | undefined {
     this.checkLock();
-    const queryOpts: QueryOpts | undefined = (opts === undefined || typeof opts === 'string' || Array.isArray(opts))
-      ? { payload: opts ?? QUERY_TYPE.ID }
-      : opts;
-    const payload: PayloadOpt = queryOpts?.payload ?? QUERY_TYPE.ID;
+    const payload: PayloadOpt = opts?.payload ?? QUERY_TYPE.ID;
     let nodes: Node[] = Object.values(this.index);
-    nodes = this.applyFilter(nodes, queryOpts?.filter);
+    nodes = this.applyFilter(nodes, opts?.filter);
     return nodes.map((node: Node) => this.resolvePayload(node.id, payload, node));
   }
 
@@ -162,13 +159,10 @@ export class Base {
     return new Set(nodetypes);
   }
 
-  zombies(opts?: QueryOpts | PayloadOpt): string[] | Node[] | any[] | undefined {
+  zombies(opts?: QueryOpts): string[] | Node[] | any[] | undefined {
     this.checkLock();
-    const queryOpts: QueryOpts = (opts === undefined || typeof opts === 'string' || Array.isArray(opts))
-      ? { payload: opts ?? QUERY_TYPE.ID }
-      : opts as QueryOpts;
-    const mergedFilter = { ...queryOpts?.filter, nodeKind: NODE.KIND.ZOMBIE as NODE.KIND };
-    return this.all({ ...queryOpts, filter: mergedFilter });
+    const mergedFilter = { ...opts?.filter, nodeKind: NODE.KIND.ZOMBIE as NODE.KIND };
+    return this.all({ ...opts, filter: mergedFilter });
   }
 
 
@@ -337,16 +331,13 @@ export class Base {
 
   // get
 
-  public get(id: string, opts?: QueryOpts | PayloadOpt): Node | any | undefined {
+  public get(id: string, opts?: QueryOpts): Node | any | undefined {
     this.checkLock();
     if (!this.index[id]) {
       console.warn(`node with id "${id}" does not exist`);
       return undefined;
     }
-    const queryOpts: QueryOpts | undefined = (opts === undefined || typeof opts === 'string' || Array.isArray(opts))
-      ? { payload: opts ?? QUERY_TYPE.NODE }
-      : opts;
-    const payload: PayloadOpt = queryOpts?.payload ?? QUERY_TYPE.NODE;
+    const payload: PayloadOpt = opts?.payload ?? QUERY_TYPE.NODE;
     return this.resolvePayload(id, payload, this.index[id]);
   }
 

@@ -1,4 +1,4 @@
-import type { Attrs, ConnectOpts, DisconnectOpts, Embed, Embeds, Link, Links, Mixin, PayloadOpt, QueryOpts } from './types';
+import type { Attrs, ConnectOpts, DisconnectOpts, Embed, Embeds, Link, Links, Mixin, QueryOpts } from './types';
 import { DATA_STRUCT, NODE, QUERY_TYPE, REL } from './const';
 import { Node } from './node';
 
@@ -9,18 +9,15 @@ export function Web<TBase extends Mixin>(Base: TBase) {
     // properties
 
     // nodes that are not linked to any other node in the web
-    isolates(opts?: QueryOpts | PayloadOpt): string[] | Node[] | any[] | undefined {
+    isolates(opts?: QueryOpts): string[] | Node[] | any[] | undefined {
       this.checkLock();
-      const queryOpts = (opts === undefined || typeof opts === 'string' || Array.isArray(opts))
-        ? { payload: opts ?? QUERY_TYPE.ID }
-        : opts;
-      const payload = queryOpts?.payload ?? QUERY_TYPE.ID;
+      const payload = opts?.payload ?? QUERY_TYPE.ID;
       /* eslint-disable indent */
       return (this.all({ payload: QUERY_TYPE.NODE }) as Node[] ?? [])
                  .filter((node: Node) =>
-                   (this.neighbors(node.id, queryOpts)?.length === 0) &&
+                   (this.neighbors(node.id, opts)?.length === 0) &&
                    (node.kind !== NODE.KIND.ZOMBIE))
-                 .map((node: Node) => this.get(node.id, { ...queryOpts, payload }));
+                 .map((node: Node) => this.get(node.id, { ...opts, payload }));
       /* eslint-enable indent */
     }
 
@@ -86,15 +83,14 @@ export function Web<TBase extends Mixin>(Base: TBase) {
     // backrefs(id: string, query: string | string[] = QueryType.id): Attrs | Record<string, Node[]> | Record<string, any> | undefined {
     // }
 
-    foreattrs(id: string, opts?: QueryOpts | PayloadOpt): Attrs | Record<string, Node[]> | Record<string, any> | undefined {
+    foreattrs(id: string, opts?: QueryOpts): Attrs | Record<string, Node[]> | Record<string, any> | undefined {
       this.checkLock();
-      const queryOpts = (opts === undefined || typeof opts === 'string' || Array.isArray(opts)) ? { payload: opts ?? QUERY_TYPE.ID } : opts;
-      if (queryOpts?.filter?.header !== undefined || queryOpts?.filter?.level === REL.LEVEL.HEADER) {
+      if (opts?.filter?.header !== undefined || opts?.filter?.level === REL.LEVEL.HEADER) {
         throw new Error('attrs do not support headers');
       }
       const node: Node | undefined = this.get(id, { payload: QUERY_TYPE.NODE });
       if (!node) { return undefined; }
-      const payload = queryOpts?.payload ?? QUERY_TYPE.ID;
+      const payload = opts?.payload ?? QUERY_TYPE.ID;
       if (payload === QUERY_TYPE.ID || payload === undefined) {
         return node.attrs;
       }
@@ -102,16 +98,15 @@ export function Web<TBase extends Mixin>(Base: TBase) {
       for (const [type, ids] of Object.entries(node.attrs)) {
         queryPayload[type] = [];
         for (const targetId of ids) {
-          queryPayload[type].push(this.get(targetId, { ...queryOpts, payload }));
+          queryPayload[type].push(this.get(targetId, { ...opts, payload }));
         }
       }
       return queryPayload;
     }
 
-    backattrs(id: string, opts?: QueryOpts | PayloadOpt): Attrs | Record<string, Node[]> | Record<string, any> | undefined {
+    backattrs(id: string, opts?: QueryOpts): Attrs | Record<string, Node[]> | Record<string, any> | undefined {
       this.checkLock();
-      const queryOpts = (opts === undefined || typeof opts === 'string' || Array.isArray(opts)) ? { payload: opts ?? QUERY_TYPE.ID } : opts;
-      if (queryOpts?.filter?.header !== undefined || queryOpts?.filter?.level === REL.LEVEL.HEADER) {
+      if (opts?.filter?.header !== undefined || opts?.filter?.level === REL.LEVEL.HEADER) {
         throw new Error('attrs do not support headers');
       }
       if (!this.has(id)) { return undefined; }
@@ -126,7 +121,7 @@ export function Web<TBase extends Mixin>(Base: TBase) {
           }
         }
       }
-      const payload = queryOpts?.payload ?? QUERY_TYPE.ID;
+      const payload = opts?.payload ?? QUERY_TYPE.ID;
       if (payload === QUERY_TYPE.ID || payload === undefined) {
         return backattrs;
       }
@@ -134,40 +129,38 @@ export function Web<TBase extends Mixin>(Base: TBase) {
       for (const [type, ids] of Object.entries(backattrs)) {
         queryPayload[type] = [];
         for (const sourceId of ids) {
-          queryPayload[type].push(this.get(sourceId, { ...queryOpts, payload }));
+          queryPayload[type].push(this.get(sourceId, { ...opts, payload }));
         }
       }
       return queryPayload;
     }
 
-    forelinks(id: string, opts?: QueryOpts | PayloadOpt): Links | [any, any][] | undefined {
+    forelinks(id: string, opts?: QueryOpts): Links | [any, any][] | undefined {
       this.checkLock();
-      const queryOpts = (opts === undefined || typeof opts === 'string' || Array.isArray(opts)) ? { payload: opts ?? QUERY_TYPE.ID } : opts;
       const node: Node | undefined = this.get(id, { payload: QUERY_TYPE.NODE });
       if (!node) { return undefined; }
-      const f = queryOpts?.filter;
+      const f = opts?.filter;
       let links: Link[] = node.links;
       if (f?.header !== undefined) { links = links.filter((l) => l.header === f.header); }
       if (f?.level === REL.LEVEL.FILE) { links = links.filter((l) => !l.header); }
       if (f?.level === REL.LEVEL.HEADER) { links = links.filter((l) => !!l.header); }
       if (f?.type !== undefined) { links = links.filter((l) => l.type === f.type); }
-      const payload = queryOpts?.payload ?? QUERY_TYPE.ID;
+      const payload = opts?.payload ?? QUERY_TYPE.ID;
       if (payload === QUERY_TYPE.ID || payload === undefined) {
         return links;
       }
-      return links.map((link) => [link.type, this.get(link.id, { ...queryOpts, payload })]) as [any, any][];
+      return links.map((link) => [link.type, this.get(link.id, { ...opts, payload })]) as [any, any][];
     }
 
-    backlinks(id: string, opts?: QueryOpts | PayloadOpt): Links | [any, any][] | undefined {
+    backlinks(id: string, opts?: QueryOpts): Links | [any, any][] | undefined {
       this.checkLock();
-      const queryOpts = (opts === undefined || typeof opts === 'string' || Array.isArray(opts)) ? { payload: opts ?? QUERY_TYPE.ID } : opts;
       if (!this.has(id)) { return undefined; }
       const backlinks: Links = [];
       for (const node of (this.all({ payload: QUERY_TYPE.NODE }) as Node[] ?? [])) {
         if (node.inLinks(id)) {
           for (const link of node.links) {
             if (id !== link.id) { continue; }
-            const f = queryOpts?.filter;
+            const f = opts?.filter;
             if (f?.header !== undefined && link.header !== f.header) { continue; }
             if (f?.level === REL.LEVEL.FILE && link.header) { continue; }
             if (f?.level === REL.LEVEL.HEADER && !link.header) { continue; }
@@ -180,40 +173,38 @@ export function Web<TBase extends Mixin>(Base: TBase) {
           }
         }
       }
-      const payload = queryOpts?.payload ?? QUERY_TYPE.ID;
+      const payload = opts?.payload ?? QUERY_TYPE.ID;
       if (payload === QUERY_TYPE.ID || payload === undefined) {
         return backlinks;
       }
-      return backlinks.map((link) => [link.type, this.get(link.id, { ...queryOpts, payload })]) as [any, any][];
+      return backlinks.map((link) => [link.type, this.get(link.id, { ...opts, payload })]) as [any, any][];
     }
 
-    foreembeds(id: string, opts?: QueryOpts | PayloadOpt): Embeds | any[] | undefined {
+    foreembeds(id: string, opts?: QueryOpts): Embeds | any[] | undefined {
       this.checkLock();
-      const queryOpts = (opts === undefined || typeof opts === 'string' || Array.isArray(opts)) ? { payload: opts ?? QUERY_TYPE.ID } : opts;
       const node: Node | undefined = this.get(id, { payload: QUERY_TYPE.NODE });
       if (!node) { return undefined; }
-      const f = queryOpts?.filter;
+      const f = opts?.filter;
       let embeds: Embed[] = node.embeds;
       if (f?.header !== undefined) { embeds = embeds.filter((e) => e.header === f.header); }
       if (f?.level === REL.LEVEL.FILE) { embeds = embeds.filter((e) => !e.header); }
       if (f?.level === REL.LEVEL.HEADER) { embeds = embeds.filter((e) => !!e.header); }
-      const payload = queryOpts?.payload ?? QUERY_TYPE.ID;
+      const payload = opts?.payload ?? QUERY_TYPE.ID;
       if (payload === QUERY_TYPE.ID || payload === undefined) {
         return embeds;
       }
-      return embeds.map((embed) => this.get(embed.id, { ...queryOpts, payload }));
+      return embeds.map((embed) => this.get(embed.id, { ...opts, payload }));
     }
 
-    backembeds(id: string, opts?: QueryOpts | PayloadOpt): Embeds | any[] | undefined {
+    backembeds(id: string, opts?: QueryOpts): Embeds | any[] | undefined {
       this.checkLock();
-      const queryOpts = (opts === undefined || typeof opts === 'string' || Array.isArray(opts)) ? { payload: opts ?? QUERY_TYPE.ID } : opts;
       if (!this.has(id)) { return undefined; }
       const backembeds: Embeds = [];
       for (const node of (this.all({ payload: QUERY_TYPE.NODE }) as Node[] ?? [])) {
         if (node.inEmbeds(id)) {
           for (const embed of node.embeds) {
             if (id !== embed.id) { continue; }
-            const f = queryOpts?.filter;
+            const f = opts?.filter;
             if (f?.header !== undefined && embed.header !== f.header) { continue; }
             if (f?.level === REL.LEVEL.FILE && embed.header) { continue; }
             if (f?.level === REL.LEVEL.HEADER && !embed.header) { continue; }
@@ -225,11 +216,11 @@ export function Web<TBase extends Mixin>(Base: TBase) {
           }
         }
       }
-      const payload = queryOpts?.payload ?? QUERY_TYPE.ID;
+      const payload = opts?.payload ?? QUERY_TYPE.ID;
       if (payload === QUERY_TYPE.ID || payload === undefined) {
         return backembeds;
       }
-      return backembeds.map((embed) => this.get(embed.id, { ...queryOpts, payload }));
+      return backembeds.map((embed) => this.get(embed.id, { ...opts, payload }));
     }
 
     neighbors(id: string, kindOrOpts?: REL.REF | QueryOpts): string[] | undefined {

@@ -1,4 +1,4 @@
-import type { Mixin, PayloadOpt, QueryOpts } from './types';
+import type { Mixin, QueryOpts } from './types';
 import { DATA_STRUCT, NODE, QUERY_TYPE, REL } from './const';
 import { Node } from './node';
 
@@ -36,85 +36,76 @@ export function Tree<TBase extends Mixin>(Base: TBase) {
 
     // tree-lvl
 
-    root(opts?: QueryOpts | PayloadOpt): string | Node | any | undefined {
+    root(opts?: QueryOpts): string | Node | any | undefined {
       this.checkLock();
       if (this._root === undefined) { return undefined; }
-      const queryOpts = (opts === undefined || typeof opts === 'string' || Array.isArray(opts)) ? { payload: opts ?? QUERY_TYPE.ID } : opts;
-      return this.get(this._root, queryOpts);
+      // default payload for root() is ID (unlike get() which defaults to NODE)
+      return this.get(this._root, opts !== undefined ? opts : { payload: QUERY_TYPE.ID });
     }
 
-    orphans(treeIDs: string[], opts?: QueryOpts | PayloadOpt): string[] | Node[] | any[] | undefined {
+    orphans(treeIDs: string[], opts?: QueryOpts): string[] | Node[] | any[] | undefined {
       this.checkLock();
-      const queryOpts: QueryOpts = (opts === undefined || typeof opts === 'string' || Array.isArray(opts))
-        ? { payload: opts ?? QUERY_TYPE.ID }
-        : opts as QueryOpts;
-      const payload = queryOpts?.payload ?? QUERY_TYPE.ID;
+      const payload = opts?.payload ?? QUERY_TYPE.ID;
       /* eslint-disable indent */
-      return (this.all({ ...queryOpts, payload: QUERY_TYPE.NODE }) as Node[] ?? [])
+      return (this.all({ ...opts, payload: QUERY_TYPE.NODE }) as Node[] ?? [])
                  .filter((node: Node) =>
                     treeIDs.includes(node.id)
                     && (node.children.length === 0)
                     && !this.parent(node.id)
                     && (node.kind !== NODE.KIND.ZOMBIE)
                  ).map((node: Node) =>
-                   this.get(node.id, { ...queryOpts, payload })
+                   this.get(node.id, { ...opts, payload })
                  );
       /* eslint-enable indent */
     }
 
-    ancestors(id: string, opts?: QueryOpts | PayloadOpt): string[] | Node[] | any[] | undefined {
+    ancestors(id: string, opts?: QueryOpts): string[] | Node[] | any[] | undefined {
       this.checkLock();
       if (!this.has(id)) { return undefined; }
       const ids: string[] = this.getRelFam(id, REL.FAM.ANCESTORS);
-      const queryOpts = (opts === undefined || typeof opts === 'string' || Array.isArray(opts)) ? { payload: opts ?? QUERY_TYPE.ID } : opts;
-      const payload = queryOpts?.payload ?? QUERY_TYPE.ID;
-      return (payload === QUERY_TYPE.ID || payload === undefined) ? ids : ids.map((nodeId) => this.get(nodeId, { ...queryOpts, payload }));
+      const payload = opts?.payload ?? QUERY_TYPE.ID;
+      return (payload === QUERY_TYPE.ID || payload === undefined) ? ids : ids.map((nodeId) => this.get(nodeId, { ...opts, payload }));
     }
 
-    parent(id: string, opts?: QueryOpts | PayloadOpt): string | Node | any | undefined {
+    parent(id: string, opts?: QueryOpts): string | Node | any | undefined {
       this.checkLock();
       if (!this.has(id)) { return undefined; }
       const ids = this.getRelFam(id, REL.FAM.PARENT);
       if (ids.length === 0) { return ''; }
-      const queryOpts = (opts === undefined || typeof opts === 'string' || Array.isArray(opts)) ? { payload: opts ?? QUERY_TYPE.ID } : opts;
-      const payload = queryOpts?.payload ?? QUERY_TYPE.ID;
-      return (payload === QUERY_TYPE.ID || payload === undefined) ? ids[0] : this.get(ids[0], { ...queryOpts, payload });
+      const payload = opts?.payload ?? QUERY_TYPE.ID;
+      return (payload === QUERY_TYPE.ID || payload === undefined) ? ids[0] : this.get(ids[0], { ...opts, payload });
     }
 
-    siblings(id: string, opts?: QueryOpts | PayloadOpt): string[] | Node[] | any[] | undefined {
+    siblings(id: string, opts?: QueryOpts): string[] | Node[] | any[] | undefined {
       this.checkLock();
       if (!this.has(id)) { return undefined; }
       const ids = this.getRelFam(id, REL.FAM.SIBLINGS);
-      const queryOpts = (opts === undefined || typeof opts === 'string' || Array.isArray(opts)) ? { payload: opts ?? QUERY_TYPE.ID } : opts;
-      const payload = queryOpts?.payload ?? QUERY_TYPE.ID;
-      return (payload === QUERY_TYPE.ID || payload === undefined) ? ids : ids.map((nodeId) => this.get(nodeId, { ...queryOpts, payload }));
+      const payload = opts?.payload ?? QUERY_TYPE.ID;
+      return (payload === QUERY_TYPE.ID || payload === undefined) ? ids : ids.map((nodeId) => this.get(nodeId, { ...opts, payload }));
     }
 
-    children(id: string, opts?: QueryOpts | PayloadOpt): string[] | Node[] | any[] | undefined {
+    children(id: string, opts?: QueryOpts): string[] | Node[] | any[] | undefined {
       this.checkLock();
       if (!this.has(id)) { return undefined; }
       const ids = this.getRelFam(id, REL.FAM.CHILDREN);
-      const queryOpts = (opts === undefined || typeof opts === 'string' || Array.isArray(opts)) ? { payload: opts ?? QUERY_TYPE.ID } : opts;
-      const payload = queryOpts?.payload ?? QUERY_TYPE.ID;
-      return (payload === QUERY_TYPE.ID || payload === undefined) ? ids : ids.map((nodeId) => this.get(nodeId, { ...queryOpts, payload }));
+      const payload = opts?.payload ?? QUERY_TYPE.ID;
+      return (payload === QUERY_TYPE.ID || payload === undefined) ? ids : ids.map((nodeId) => this.get(nodeId, { ...opts, payload }));
     }
 
-    descendants(id: string, opts?: QueryOpts | PayloadOpt): string[] | Node[] | any[] | undefined {
+    descendants(id: string, opts?: QueryOpts): string[] | Node[] | any[] | undefined {
       this.checkLock();
       if (!this.has(id)) { return undefined; }
       const ids = this.getRelFam(id, REL.FAM.DESCENDANTS);
-      const queryOpts = (opts === undefined || typeof opts === 'string' || Array.isArray(opts)) ? { payload: opts ?? QUERY_TYPE.ID } : opts;
-      const payload = queryOpts?.payload ?? QUERY_TYPE.ID;
-      return (payload === QUERY_TYPE.ID || payload === undefined) ? ids : ids.map((nodeId) => this.get(nodeId, { ...queryOpts, payload }));
+      const payload = opts?.payload ?? QUERY_TYPE.ID;
+      return (payload === QUERY_TYPE.ID || payload === undefined) ? ids : ids.map((nodeId) => this.get(nodeId, { ...opts, payload }));
     }
 
-    lineage(id: string, opts?: QueryOpts | PayloadOpt): string[] | Node[] | any[] | undefined {
+    lineage(id: string, opts?: QueryOpts): string[] | Node[] | any[] | undefined {
       this.checkLock();
       if (!this.has(id)) { return undefined; }
       const ids = this.getRelFam(id, REL.FAM.LINEAGE);
-      const queryOpts = (opts === undefined || typeof opts === 'string' || Array.isArray(opts)) ? { payload: opts ?? QUERY_TYPE.ID } : opts;
-      const payload = queryOpts?.payload ?? QUERY_TYPE.ID;
-      return (payload === QUERY_TYPE.ID || payload === undefined) ? ids : ids.map((nodeId) => this.get(nodeId, { ...queryOpts, payload }));
+      const payload = opts?.payload ?? QUERY_TYPE.ID;
+      return (payload === QUERY_TYPE.ID || payload === undefined) ? ids : ids.map((nodeId) => this.get(nodeId, { ...opts, payload }));
     }
 
     level(id: string): number | undefined  {
