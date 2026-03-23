@@ -24,7 +24,6 @@ export class Base {
   // key opts
   public uniqKeys: string[] = [];                                        // node data key that should be unique
   public zombieKey: string = '';                                         // node data key that should be unique across zombies too
-  public useHeaders: boolean = false;                                    // whether to include header links by default
   // async opts
   public useLock: boolean;                                               // whether index should be thread-safe
   public lock: Mutex;                                                    // the actual mutex lock

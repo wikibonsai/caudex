@@ -162,6 +162,162 @@ describe('base', () => {
 
     });
 
+    describe('all() filters', () => {
+
+      beforeEach(() => {
+        const filterData = [
+          { init: { id: '1' }, data: { uri: 'file://data/1', filename: 'one', title: 'One', headers: [] } },
+          { init: { id: '2' }, data: { uri: 'file://data/2', filename: 'two', title: 'Two', headers: [] } },
+          { init: { id: '4' }, data: { uri: 'file://data/4', filename: 'four', title: 'Four', headers: [] } },
+        ];
+        const opts: any = { uniqKeys: ['uri', 'filename'], zombieKey: 'filename' };
+        base = new Base(filterData, opts);
+        base.index['1'].type = 'entry';
+        base.index['2'].type = 'index';
+        base.index['4'].type = 'entry';
+        base.add('zombie-name');
+      });
+
+      it('filter by nodeKind DOC', () => {
+        const out = base.all({ filter: { nodeKind: NODE.KIND.DOC } }) as string[];
+        assert.strictEqual(out.length, 3);
+        assert.ok(out.includes('1') && out.includes('2') && out.includes('4'));
+      });
+
+      it('filter by nodeKind ZOMBIE', () => {
+        const out = base.all({ filter: { nodeKind: NODE.KIND.ZOMBIE } }) as string[];
+        assert.deepEqual(out, ['404']);
+      });
+
+      it('filter by nodeType entry', () => {
+        const out = base.all({ filter: { nodeType: 'entry' } }) as string[];
+        assert.deepEqual(out.sort(), ['1', '4']);
+      });
+
+      it('filter by nodeType index', () => {
+        const out = base.all({ filter: { nodeType: 'index' } }) as string[];
+        assert.deepEqual(out, ['2']);
+      });
+
+      it('filter by filename', () => {
+        assert.deepEqual(base.all({ filter: { filename: 'one' } }), ['1']);
+      });
+
+      it('filter by nodeKind and nodeType', () => {
+        const out = base.all({ filter: { nodeKind: NODE.KIND.DOC, nodeType: 'entry' } }) as string[];
+        assert.deepEqual(out.sort(), ['1', '4']);
+      });
+
+      it('filter with no matches', () => {
+        assert.deepEqual(base.all({ filter: { nodeType: 'nonexistent' } }), []);
+      });
+
+    });
+
+    describe('all() payloads', () => {
+
+      beforeEach(() => {
+        const payloadData = [
+          { init: { id: '1' }, data: { uri: 'file://data/1', filename: 'one', title: 'One', headers: [] } },
+          { init: { id: '2' }, data: { uri: 'file://data/2', filename: 'two', title: 'Two', headers: [] } },
+          { init: { id: '3' }, data: { uri: 'file://data/3', filename: 'three', title: 'Three', headers: [] } },
+          { init: { id: '4' }, data: { uri: 'file://data/4', filename: 'four', title: 'Four', headers: [] } },
+        ];
+        const opts: any = { uniqKeys: ['uri', 'filename'], zombieKey: 'filename' };
+        base = new Base(payloadData, opts);
+      });
+
+      it('payload id (default)', () => {
+        const out = base.all() as string[];
+        assert.deepEqual(out.sort(), ['1', '2', '3', '4']);
+      });
+
+      it('payload id (explicit)', () => {
+        const out = base.all({ payload: QUERY_TYPE.ID }) as string[];
+        assert.deepEqual(out.sort(), ['1', '2', '3', '4']);
+      });
+
+      it('payload node', () => {
+        const out = base.all({ payload: QUERY_TYPE.NODE }) as Node[];
+        assert.strictEqual(out.length, 4);
+        assert.strictEqual(out[0].id, '1');
+      });
+
+      it('payload data', () => {
+        const out = base.all({ payload: QUERY_TYPE.DATA }) as any[];
+        assert.strictEqual(out.length, 4);
+        assert.ok(out.every((d: any) => d.uri && d.filename && d.title && Array.isArray(d.headers)));
+      });
+
+      it('payload nodekind', () => {
+        const out = base.all({ payload: QUERY_TYPE.NODEKIND }) as string[];
+        assert.strictEqual(out.length, 4);
+        assert.ok(out.every((k: string) => k === NODE.KIND.DOC));
+      });
+
+      it('payload nodetype', () => {
+        const out = base.all({ payload: QUERY_TYPE.NODETYPE }) as string[];
+        assert.strictEqual(out.length, 4);
+      });
+
+      it('payload single data key', () => {
+        assert.deepEqual((base.all({ payload: 'filename' }) as string[]).sort(), ['four', 'one', 'three', 'two']);
+      });
+
+      it('payload multiple data keys', () => {
+        const out = base.all({ payload: ['filename', 'uri'] }) as any[];
+        assert.strictEqual(out.length, 4);
+        assert.deepEqual(out.find((o: any) => o.filename === 'one'), { filename: 'one', uri: 'file://data/1' });
+      });
+
+      it('filter and payload combined', () => {
+        base.index['1'].type = 'entry';
+        base.index['4'].type = 'entry';
+        const out = base.all({ filter: { nodeType: 'entry' }, payload: 'filename' }) as string[];
+        assert.deepEqual(out.sort(), ['four', 'one']);
+      });
+
+    });
+
+    describe('get() payloads', () => {
+
+      it('payload node (default)', () => {
+        const out = base.get('1');
+        assert.ok(out && typeof out === 'object' && (out as Node).id === '1');
+      });
+
+      it('payload id', () => {
+        assert.strictEqual(base.get('1', { payload: QUERY_TYPE.ID }), '1');
+      });
+
+      it('payload data', () => {
+        const out = base.get('1', { payload: QUERY_TYPE.DATA }) as any;
+        assert.ok(out.uri && out.filename && out.title);
+      });
+
+      it('payload nodekind', () => {
+        assert.strictEqual(base.get('1', { payload: QUERY_TYPE.NODEKIND }), NODE.KIND.DOC);
+      });
+
+      it('payload nodetype', () => {
+        assert.strictEqual(base.get('1', { payload: QUERY_TYPE.NODETYPE }), NODE.TYPE.DEFAULT);
+      });
+
+      it('payload single data key', () => {
+        assert.strictEqual(base.get('1', { payload: 'filename' }), 'one');
+      });
+
+      it('payload multiple keys', () => {
+        const out = base.get('1', { payload: ['filename', 'uri'] }) as any;
+        assert.deepEqual(out, { filename: 'one', uri: 'file://data/1' });
+      });
+
+      it('nonexistent id', () => {
+        assert.strictEqual(base.get('-1', { payload: QUERY_TYPE.DATA }), undefined);
+      });
+
+    });
+
     describe('clear()', () => {
 
       it('return all ids in index', () => {
@@ -201,13 +357,178 @@ describe('base', () => {
 
     });
 
+    describe('query opts', () => {
+
+      describe('filter', () => {
+        it('filter.nodeKind returns only matching kind', () => {
+          assert.deepEqual(base.all({ filter: { nodeKind: NODE.KIND.DOC } }), ['1', '2']);
+          base.add('zombie-filename');
+          assert.deepEqual(base.all({ filter: { nodeKind: NODE.KIND.DOC } }), ['1', '2']);
+          assert.deepEqual(base.all({ filter: { nodeKind: NODE.KIND.ZOMBIE } }), ['404']);
+        });
+
+        it('filter.nodeType returns only matching type', () => {
+          base.index['1'].type = NODE.TYPE.ENTRY as string;
+          base.index['2'].type = NODE.TYPE.DEFAULT;
+          assert.deepEqual(base.all({ filter: { nodeType: NODE.TYPE.ENTRY } }), ['1']);
+          assert.deepEqual(base.all({ filter: { nodeType: NODE.TYPE.DEFAULT } }), ['2']);
+        });
+
+        it('filter.filename returns only matching node', () => {
+          assert.deepEqual(base.all({ filter: { filename: 'one' } }), ['1']);
+          assert.deepEqual(base.all({ filter: { filename: 'two' } }), ['2']);
+          assert.deepEqual(base.all({ filter: { filename: 'nonexistent' } }), []);
+        });
+
+        it('filter combines with payload', () => {
+          base.index['1'].type = NODE.TYPE.ENTRY as string;
+          const out = base.all({ filter: { nodeType: NODE.TYPE.ENTRY }, payload: QUERY_TYPE.NODE }) as Node[];
+          assert.strictEqual(out.length, 1);
+          assert.strictEqual(out[0].id, '1');
+          assert.deepEqual(
+            base.all({ filter: { filename: 'one' }, payload: 'title' }),
+            ['One']
+          );
+        });
+      });
+
+      describe('payload', () => {
+
+        it('payload id (default)', () => {
+          assert.deepEqual(base.all(), ['1', '2']);
+          assert.deepEqual(base.all({ payload: QUERY_TYPE.ID }), ['1', '2']);
+        });
+
+        it('payload node', () => {
+          const nodes = base.all({ payload: QUERY_TYPE.NODE }) as Node[];
+          assert.strictEqual(nodes.length, 2);
+          assert.strictEqual(nodes[0].id, '1');
+          assert.strictEqual(nodes[0].kind, NODE.KIND.DOC);
+          assert.strictEqual(nodes[0].type, NODE.TYPE.DEFAULT);
+        });
+
+        it('payload nodekind', () => {
+          assert.deepEqual(base.all({ payload: QUERY_TYPE.NODEKIND }), [NODE.KIND.DOC, NODE.KIND.DOC]);
+        });
+
+        it('payload nodetype', () => {
+          assert.deepEqual(base.all({ payload: QUERY_TYPE.NODETYPE }), [NODE.TYPE.DEFAULT, NODE.TYPE.DEFAULT]);
+        });
+
+        it('payload data', () => {
+          const out = base.all({ payload: QUERY_TYPE.DATA }) as any[];
+          assert.strictEqual(out.length, 2);
+          assert.deepEqual(out[0], { uri: 'file://data/1', filename: 'one', title: 'One' });
+          assert.deepEqual(out[1], { uri: 'file://data/2', filename: 'two', title: 'Two' });
+        });
+
+        it('payload single string (data key)', () => {
+          assert.deepEqual(base.all({ payload: 'filename' }), ['one', 'two']);
+          assert.deepEqual(base.all({ payload: 'title' }), ['One', 'Two']);
+        });
+
+        it('payload string[] (multiple keys → object)', () => {
+          const out = base.all({ payload: ['id', 'filename', 'title'] }) as any[];
+          assert.strictEqual(out.length, 2);
+          assert.deepEqual(out[0], { id: '1', filename: 'one', title: 'One' });
+          assert.deepEqual(out[1], { id: '2', filename: 'two', title: 'Two' });
+        });
+      });
+
+      describe('get', () => {
+
+        it('get with payload id', () => {
+          assert.strictEqual(base.get('1', { payload: QUERY_TYPE.ID }), '1');
+        });
+
+        it('get with payload node (default)', () => {
+          const node = base.get('1', { payload: QUERY_TYPE.NODE }) as Node;
+          assert.strictEqual(node.id, '1');
+          assert.strictEqual(node.kind, NODE.KIND.DOC);
+        });
+
+        it('get with payload nodekind', () => {
+          assert.strictEqual(base.get('1', { payload: QUERY_TYPE.NODEKIND }), NODE.KIND.DOC);
+        });
+
+        it('get with payload nodetype', () => {
+          assert.strictEqual(base.get('1', { payload: QUERY_TYPE.NODETYPE }), NODE.TYPE.DEFAULT);
+        });
+
+        it('get with payload data', () => {
+          assert.deepEqual(base.get('1', { payload: QUERY_TYPE.DATA }), {
+            uri: 'file://data/1',
+            filename: 'one',
+            title: 'One',
+          });
+        });
+
+        it('get with payload single string', () => {
+          assert.strictEqual(base.get('1', { payload: 'filename' }), 'one');
+        });
+
+        it('get with payload string[]', () => {
+          assert.deepEqual(base.get('1', { payload: ['id', 'uri', 'filename'] }), {
+            id: '1',
+            uri: 'file://data/1',
+            filename: 'one',
+          });
+
+        });
+
+        it('get missing id with payload returns undefined', () => {
+          assert.strictEqual(base.get('-1', { payload: QUERY_TYPE.NODE }), undefined);
+          assert.strictEqual(base.get('-1', { payload: 'filename' }), undefined);
+        });
+
+        it('get with filter: filter is ignored; result depends only on payload', () => {
+          // get(id, opts) does not apply filter; only payload shapes the result.
+          const noFilter = base.get('1', { payload: QUERY_TYPE.NODE }) as Node;
+          const withFilter = base.get('1', { filter: { filename: 'other' }, payload: QUERY_TYPE.NODE }) as Node;
+          assert.strictEqual(noFilter.id, withFilter.id, 'filter is ignored; same node returned');
+        });
+
+      });
+
+      describe('zombies(opts)', () => {
+
+        it('zombies with payload id (default)', () => {
+          base.add('brains');
+          assert.deepEqual(base.zombies(), ['404']);
+        });
+
+        it('zombies with payload zombie key value', () => {
+          base.add('brains');
+          assert.deepEqual(base.zombies({ payload: QUERY_TYPE.ZOMBIE }), ['brains']);
+        });
+
+        it('zombies with payload data', () => {
+          base.add('brains');
+          assert.deepEqual(base.zombies({ payload: QUERY_TYPE.DATA }), [{ filename: 'brains' }]);
+        });
+
+        it('zombies with payload node', () => {
+          base.add('brains');
+          const out = base.zombies({ payload: QUERY_TYPE.NODE }) as Node[];
+          assert.strictEqual(out.length, 1);
+          assert.strictEqual(out[0].kind, NODE.KIND.ZOMBIE);
+        });
+
+        it('zombies with payload filename', () => {
+          base.add('brains');
+          assert.deepEqual(base.zombies({ payload: 'filename' }), ['brains']);
+        });
+      });
+
+    });
+
   });
 
   describe('index properties', () => {
 
     describe('zombies', () => {
 
-      it(NODE.TYPE.DEFAULT, () => {
+      it('returns zombie ids when present', () => {
         base.add('braaaains');
         assert.deepEqual(base.zombies(), ['404']);
       });
@@ -509,7 +830,7 @@ describe('base', () => {
 
       describe('flushRels()', () => {
 
-        it(NODE.TYPE.DEFAULT, () => {
+        it('clears relationship refs', () => {
           // setup
           const node1: Node = base.index['1'];
           const node2: Node = base.index['2'];

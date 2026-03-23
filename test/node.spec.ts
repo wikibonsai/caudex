@@ -113,6 +113,12 @@ describe('node', () => {
       assert.strictEqual(node.inLinks('4', undefined), true);
     });
 
+    it('inLinks() without header: does not filter by header; any link to id matches', () => {
+      node.links = [{ id: '4', type: 't', header: 'section-a' }];
+      assert.strictEqual(node.inLinks('4'), true, 'omitting header returns true if any link to id exists');
+      assert.strictEqual(node.inLinks('4', undefined), true);
+    });
+
     it('inEmbeds()', () => {
       assert.strictEqual(node.inEmbeds('5'), true);
       assert.strictEqual(node.inEmbeds('-1'), false);
@@ -126,6 +132,12 @@ describe('node', () => {
       assert.strictEqual(node.inEmbeds('5'), true);
       assert.strictEqual(node.inEmbeds('5', 'intro'), true);
       assert.strictEqual(node.inEmbeds('5', 'other'), false);
+      assert.strictEqual(node.inEmbeds('5', undefined), true);
+    });
+
+    it('inEmbeds() without header: does not filter by header; any embed to id matches', () => {
+      node.embeds = [{ id: '5', media: NODE.MEDIA.MARKDOWN, header: 'intro' }];
+      assert.strictEqual(node.inEmbeds('5'), true, 'omitting header returns true if any embed to id exists');
       assert.strictEqual(node.inEmbeds('5', undefined), true);
     });
 

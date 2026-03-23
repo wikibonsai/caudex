@@ -501,6 +501,294 @@ describe('web', () => {
 
     });
 
+    describe('query opts (filter + payload)', () => {
+
+      describe('filter', () => {
+
+        it('forelinks/backlinks filter.type returns only matching link type', () => {
+          wiki.connect('1', '2', { kind: REL.REF.LINK, type: 'is-a' });
+          wiki.connect('1', '2', { kind: REL.REF.LINK, type: 'tagged' });
+          wiki.connect('1', '3', { kind: REL.REF.LINK, type: 'is-a' });
+          assert.strictEqual(wiki.forelinks('1').length, 3);
+          const isaLinks = wiki.forelinks('1', { filter: { type: 'is-a' } });
+          assert.strictEqual(isaLinks.length, 2);
+          assert.ok(isaLinks.some((l: any) => l.id === '2' && l.type === 'is-a'));
+          assert.ok(isaLinks.some((l: any) => l.id === '3' && l.type === 'is-a'));
+          assert.deepEqual(wiki.forelinks('1', { filter: { type: 'tagged' } }), [{ type: 'tagged', id: '2' }]);
+          const backTo2 = wiki.backlinks('2', { filter: { type: 'is-a' } });
+          assert.strictEqual(backTo2.length, 1);
+          assert.strictEqual(backTo2[0].type, 'is-a');
+          assert.strictEqual(backTo2[0].id, '1');
+        });
+
+        it('neighbors with filter kind', () => {
+          wiki.index['1'].attrs['a'] = new Set(['2']);
+          wiki.index['1'].links.push({ type: 't', id: '3' });
+          assert.deepEqual(wiki.neighbors('1', { filter: { kind: REL.REF.ATTR } }), ['2']);
+          assert.deepEqual(wiki.neighbors('1', { filter: { kind: REL.REF.LINK } }), ['3']);
+        });
+
+        it('isolates with filter: filter not applied to isolate set; full list returned', () => {
+          // isolates() does not pass filter to all(); which nodes are isolates is unchanged by filter.
+          const noFilter = wiki.isolates();
+          const withFilter = wiki.isolates({ filter: { filename: 'one' } });
+          assert.deepEqual(withFilter, noFilter, 'filter does not restrict which nodes are isolates');
+        });
+
+        it('neighbors with filter (non-kind): only filter.kind is used; other filter fields ignored', () => {
+          wiki.index['1'].links.push({ type: 't', id: '2' });
+          const withKind = wiki.neighbors('1', { filter: { kind: REL.REF.LINK } });
+          const withKindAndFilename = wiki.neighbors('1', { filter: { kind: REL.REF.LINK, filename: 'one' } });
+          assert.deepEqual(withKindAndFilename, withKind, 'filter.filename (and other non-kind fields) are ignored');
+        });
+
+      });
+
+      describe('payload', () => {
+
+        it('foreattrs with payload node', () => {
+          wiki.index['1'].attrs['test'] = new Set(['2', '3']);
+          const out = wiki.foreattrs('1', { payload: QUERY_TYPE.NODE }) as Record<string, Node[]>;
+          assert.deepEqual(Object.keys(out), ['test']);
+          assert.strictEqual(out.test.length, 2);
+          assert.strictEqual(out.test[0].id, '2');
+          assert.strictEqual(out.test[1].id, '3');
+        });
+
+        it('foreattrs with payload single key', () => {
+          wiki.index['1'].attrs['test'] = new Set(['2']);
+          const out = wiki.foreattrs('1', { payload: 'filename' }) as Record<string, any[]>;
+          assert.deepEqual(out, { test: ['two'] });
+        });
+
+        it('forelinks with payload node', () => {
+          wiki.connect('1', '2', { kind: REL.REF.LINK, type: 't' });
+          const out = wiki.forelinks('1', { payload: QUERY_TYPE.NODE }) as [any, Node][];
+          assert.strictEqual(out.length, 1);
+          assert.strictEqual(out[0][0], 't');
+          assert.strictEqual(out[0][1].id, '2');
+        });
+
+        it('forelinks with payload single key', () => {
+          wiki.connect('1', '2', { kind: REL.REF.LINK, type: 't' });
+          const out = wiki.forelinks('1', { payload: 'filename' }) as [any, string][];
+          assert.deepEqual(out, [['t', 'two']]);
+        });
+
+        it('backlinks with payload string[]', () => {
+          wiki.connect('1', '2', { kind: REL.REF.LINK, type: 't' });
+          const out = wiki.backlinks('2', { payload: ['id', 'filename'] }) as [any, any][];
+          assert.strictEqual(out.length, 1);
+          assert.strictEqual(out[0][0], 't');
+          assert.deepEqual(out[0][1], { id: '1', filename: 'one' });
+        });
+
+        it('foreembeds with payload id (default)', () => {
+          wiki.connect('1', '2', { kind: REL.REF.EMBED });
+          assert.deepEqual(wiki.foreembeds('1'), [{ id: '2', media: NODE.MEDIA.MARKDOWN }]);
+        });
+
+        it('isolates with payload node', () => {
+          const out = wiki.isolates({ payload: QUERY_TYPE.NODE }) as Node[];
+          assert.strictEqual(out.length, 4);
+          assert.strictEqual(out[0].id, '1');
+        });
+
+      });
+
+      describe('filter + payload combined', () => {
+
+        it('forelinks filter.level and payload', () => {
+          wiki.connect('1', '2', { kind: REL.REF.LINK, type: 't' });
+          wiki.connect('1', '2', { kind: REL.REF.LINK, type: 't', header: 's1' });
+          const fileLevel = wiki.forelinks('1', { filter: { level: LEVEL.FILE }, payload: 'filename' }) as [any, string][];
+          assert.strictEqual(fileLevel.length, 1);
+          assert.strictEqual(fileLevel[0][1], 'two');
+          const headerLevel = wiki.forelinks('1', { filter: { level: LEVEL.HEADER }, payload: 'filename' }) as [any, string][];
+          assert.strictEqual(headerLevel.length, 1);
+          assert.strictEqual(headerLevel[0][1], 'two');
+        });
+
+      });
+
+      describe('links', () => {
+
+        beforeEach(() => {
+          wiki.connect('1', '2', { kind: REL.REF.LINK, type: 'cite' });
+          wiki.connect('1', '2', { kind: REL.REF.LINK, type: 'cite', header: 'intro' });
+          wiki.connect('1', '3', { kind: REL.REF.LINK, type: 'see-also' });
+          wiki.connect('1', '3', { kind: REL.REF.LINK, type: 'see-also', header: 'body' });
+        });
+
+        it('forelinks filter type', () => {
+          const out = wiki.forelinks('1', { filter: { type: 'cite' } });
+          assert.strictEqual(out.length, 2);
+        });
+
+        it('forelinks filter type and level', () => {
+          const out = wiki.forelinks('1', { filter: { type: 'cite', level: LEVEL.HEADER } });
+          assert.strictEqual(out.length, 1);
+          assert.strictEqual(out[0].header, 'intro');
+        });
+
+        it('forelinks filter and payload node', () => {
+          const out = wiki.forelinks('1', { filter: { level: LEVEL.FILE }, payload: QUERY_TYPE.NODE }) as [any, Node][];
+          assert.strictEqual(out.length, 2);
+          assert.ok(out[0][1] && (out[0][1] as Node).id);
+        });
+
+        it('forelinks filter header specific', () => {
+          const out = wiki.forelinks('1', { filter: { header: 'intro' } });
+          assert.strictEqual(out.length, 1);
+          assert.strictEqual(out[0].header, 'intro');
+        });
+
+        it('forelinks filter header no match', () => {
+          assert.deepEqual(wiki.forelinks('1', { filter: { header: 'nonexistent' } }), []);
+        });
+
+        it('backlinks filter type', () => {
+          const out = wiki.backlinks('2', { filter: { type: 'cite' } });
+          assert.strictEqual(out.length, 2);
+        });
+
+        it('backlinks filter header specific', () => {
+          const out = wiki.backlinks('2', { filter: { header: 'intro' } });
+          assert.strictEqual(out.length, 1);
+          assert.strictEqual(out[0].header, 'intro');
+        });
+
+        it('backlinks filter and payload combined', () => {
+          const out = wiki.backlinks('2', { filter: { level: LEVEL.FILE }, payload: 'filename' }) as [any, string][];
+          assert.strictEqual(out.length, 1);
+          assert.strictEqual(out[0][0], 'cite');
+          assert.strictEqual(out[0][1], 'one');
+        });
+
+      });
+
+      describe('embeds', () => {
+
+        beforeEach(() => {
+          wiki.connect('1', '2', { kind: REL.REF.EMBED });
+          wiki.connect('1', '2', { kind: REL.REF.EMBED, header: 'intro' });
+          wiki.connect('3', '2', { kind: REL.REF.EMBED, header: 'body' });
+        });
+
+        it('backembeds filter level file', () => {
+          const out = wiki.backembeds('2', { filter: { level: LEVEL.FILE } });
+          assert.strictEqual(out.length, 1);
+          assert.strictEqual(out[0].header, undefined);
+        });
+
+        it('backembeds filter level header', () => {
+          const out = wiki.backembeds('2', { filter: { level: LEVEL.HEADER } });
+          assert.strictEqual(out.length, 2);
+        });
+
+        it('backembeds filter header specific', () => {
+          const out = wiki.backembeds('2', { filter: { header: 'intro' } });
+          assert.strictEqual(out.length, 1);
+          assert.strictEqual(out[0].header, 'intro');
+        });
+
+        it('backembeds filter and payload', () => {
+          const out = wiki.backembeds('2', { filter: { level: LEVEL.HEADER }, payload: QUERY_TYPE.NODE }) as any[];
+          assert.strictEqual(out.length, 2);
+          assert.ok(out[0].id);
+        });
+
+      });
+
+      describe('connect disconnect roundtrips', () => {
+
+        it('link header roundtrip', () => {
+          assert.strictEqual(wiki.connect('1', '2', { kind: REL.REF.LINK, type: 't', header: 'h1' }), true);
+          let out = wiki.forelinks('1', { filter: { header: 'h1' } });
+          assert.strictEqual(out.length, 1);
+          assert.strictEqual(out[0].header, 'h1');
+          out = wiki.backlinks('2', { filter: { header: 'h1' } });
+          assert.strictEqual(out.length, 1);
+          assert.strictEqual(wiki.disconnect('1', '2', { kind: REL.REF.LINK, type: 't', header: 'h1' }), true);
+          assert.deepEqual(wiki.forelinks('1', { filter: { header: 'h1' } }), []);
+        });
+
+        it('embed header roundtrip', () => {
+          assert.strictEqual(wiki.connect('1', '2', { kind: REL.REF.EMBED, header: 'h1' }), true);
+          let out = wiki.foreembeds('1', { filter: { header: 'h1' } });
+          assert.strictEqual(out.length, 1);
+          assert.strictEqual(out[0].header, 'h1');
+          out = wiki.backembeds('2', { filter: { header: 'h1' } });
+          assert.strictEqual(out.length, 1);
+          assert.strictEqual(wiki.disconnect('1', '2', { kind: REL.REF.EMBED, header: 'h1' }), true);
+          assert.deepEqual(wiki.foreembeds('1', { filter: { header: 'h1' } }), []);
+        });
+
+        it('connect file and header disconnect only header', () => {
+          wiki.connect('1', '2', { kind: REL.REF.LINK, type: 't' });
+          wiki.connect('1', '2', { kind: REL.REF.LINK, type: 't', header: 's1' });
+          assert.strictEqual(wiki.disconnect('1', '2', { kind: REL.REF.LINK, type: 't', header: 's1' }), true);
+          const out = wiki.forelinks('1', { filter: { level: LEVEL.FILE } });
+          assert.strictEqual(out.length, 1);
+          assert.strictEqual(out[0].header, undefined);
+        });
+
+        it('connect attr with header throws', () => {
+          assert.throws(
+            () => wiki.connect('1', '2', { kind: REL.REF.ATTR, type: 't', header: 'h' }),
+            /attrs do not support headers/
+          );
+        });
+
+      });
+
+      describe('neighbors filter', () => {
+
+        it('neighbors default', () => {
+          wiki.index['1'].attrs['a'] = new Set(['2']);
+          wiki.index['1'].links.push({ type: 't', id: '3' });
+          wiki.index['1'].embeds.push({ id: '4', media: NODE.MEDIA.MARKDOWN });
+          const out = wiki.neighbors('1');
+          assert.strictEqual(out!.length, 3);
+          assert.ok(out!.includes('2') && out!.includes('3') && out!.includes('4'));
+        });
+
+        it('neighbors filter by kind link', () => {
+          wiki.index['1'].attrs['a'] = new Set(['2']);
+          wiki.index['1'].links.push({ type: 't', id: '3' });
+          wiki.index['1'].embeds.push({ id: '4', media: NODE.MEDIA.MARKDOWN });
+          assert.deepEqual(wiki.neighbors('1', { filter: { kind: REL.REF.LINK } }), ['3']);
+        });
+
+        it('neighbors filter by kind attr', () => {
+          wiki.index['1'].attrs['a'] = new Set(['2']);
+          wiki.index['1'].links.push({ type: 't', id: '3' });
+          assert.deepEqual(wiki.neighbors('1', { filter: { kind: REL.REF.ATTR } }), ['2']);
+        });
+
+        it('neighbors filter by kind embed', () => {
+          wiki.index['1'].embeds.push({ id: '2', media: NODE.MEDIA.MARKDOWN });
+          assert.deepEqual(wiki.neighbors('1', { filter: { kind: REL.REF.EMBED } }), ['2']);
+        });
+      });
+
+      describe('isolates payload', () => {
+        it('isolates payload node', () => {
+          const out = wiki.isolates({ payload: QUERY_TYPE.NODE }) as Node[];
+          assert.strictEqual(out.length, 4);
+          assert.strictEqual(out[0].id, '1');
+        });
+
+        it('isolates payload data', () => {
+          const out = wiki.isolates({ payload: QUERY_TYPE.DATA }) as any[];
+          assert.strictEqual(out.length, 4);
+          assert.ok(out[0].uri && out[0].filename);
+        });
+
+      });
+
+    });
+
   });
 
   describe('methods', () => {
