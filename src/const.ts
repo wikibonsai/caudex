@@ -35,6 +35,12 @@ export namespace NODE {
     // IMAGE       = 'image',
     // VIDEO       = 'video',
   }
+
+  // document state (relationship to tree/web)
+  export enum STATE {
+    ORPHAN      = 'orphan',       // not in tree
+    ISOLATE     = 'isolate',      // not in web
+  }
 }
 
 // relationship information (rel kind) //
@@ -61,19 +67,12 @@ export namespace REL {
     EMBED       = 'embed',
   }
 
-  // partial
-  export enum PART {
-    DANGLER    = 'dangler',      // tree + web
-    ORPHAN     = 'orphan',       // tree
-    ISOLATE    = 'isolate',      // web
+  // ref level (file vs header targeting)
+  export enum LEVEL {
+    FILE    = 'file',
+    HEADER  = 'header',
+    // BLOCK   = 'block',
   }
-
-  // // level
-  // export enum LEVEL {
-  //   FILE        = 'file',
-  //   HEADER      = 'header',
-  //   BLOCK       = 'block',
-  // }
 }
 
 export enum QUERY_TYPE {
