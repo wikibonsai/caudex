@@ -3,7 +3,7 @@ import sinon from 'sinon';
 
 import nanoid from 'nanoid';
 
-import { NODE } from '../src/const';
+import { NODE, QUERY_TYPE } from '../src/const';
 import { Node } from '../src/node';
 import { Base } from '../src/base';
 import { Tree } from '../src/tree';
@@ -164,16 +164,16 @@ describe('tree', () => {
     describe('orphans', () => {
 
       it('index has orphans', () => {
-        assert.deepEqual(bonsai.orphans(bonsai.all('id')), ['5']);
+        assert.deepEqual(bonsai.orphans(bonsai.all()), ['5']);
       });
 
       it('index has no orphans', () => {
         bonsai.rm('5');
-        assert.deepEqual(bonsai.orphans(bonsai.all('id')), []);
+        assert.deepEqual(bonsai.orphans(bonsai.all()), []);
       });
 
       it('with query', () => {
-        assert.deepEqual(bonsai.orphans(bonsai.all('id'), 'node'), [{
+        assert.deepEqual(bonsai.orphans(bonsai.all(), { payload: QUERY_TYPE.NODE }), [{
           id: '5',
           kind: NODE.KIND.DOC,
           type: NODE.TYPE.DEFAULT,
@@ -205,13 +205,13 @@ describe('tree', () => {
       });
 
       it('with query', () => {
-        assert.deepEqual(bonsai.ancestors('1', ['id', 'uri', 'filename']), []);
-        assert.deepEqual(bonsai.ancestors('2', ['id', 'uri', 'filename']), [{
+        assert.deepEqual(bonsai.ancestors('1', { payload: ['id', 'uri', 'filename'] }), []);
+        assert.deepEqual(bonsai.ancestors('2', { payload: ['id', 'uri', 'filename'] }), [{
           id: '1',
           uri: 'file://data/1',
           filename: 'one'
         }]);
-        assert.deepEqual(bonsai.ancestors('3', ['id', 'uri', 'filename']), [
+        assert.deepEqual(bonsai.ancestors('3', { payload: ['id', 'uri', 'filename'] }), [
           {
             id: '1',
             uri: 'file://data/1',
@@ -223,7 +223,7 @@ describe('tree', () => {
             filename: 'two',
           }
         ]);
-        assert.deepEqual(bonsai.ancestors('4', ['id', 'uri', 'filename']), [
+        assert.deepEqual(bonsai.ancestors('4', { payload: ['id', 'uri', 'filename'] }), [
           {
             id: '1',
             uri: 'file://data/1',
@@ -253,18 +253,18 @@ describe('tree', () => {
       });
 
       it('with query', () => {
-        assert.strictEqual(bonsai.parent('1', ['id', 'uri', 'filename']), '');
-        assert.deepEqual(bonsai.parent('2', ['id', 'uri', 'filename']), {
+        assert.strictEqual(bonsai.parent('1', { payload: ['id', 'uri', 'filename'] }), '');
+        assert.deepEqual(bonsai.parent('2', { payload: ['id', 'uri', 'filename'] }), {
           id: '1',
           uri: 'file://data/1',
           filename: 'one',
         });
-        assert.deepEqual(bonsai.parent('3', ['id', 'uri', 'filename']), {
+        assert.deepEqual(bonsai.parent('3', { payload: ['id', 'uri', 'filename'] }), {
           id: '2',
           uri: 'file://data/2',
           filename: 'two',
         });
-        assert.deepEqual(bonsai.parent('4', ['id', 'uri', 'filename']), {
+        assert.deepEqual(bonsai.parent('4', { payload: ['id', 'uri', 'filename'] }), {
           id: '2',
           uri: 'file://data/2',
           filename: 'two',
@@ -287,14 +287,14 @@ describe('tree', () => {
       });
 
       it('with query', () => {
-        assert.deepEqual(bonsai.siblings('1', ['id', 'uri', 'filename']), []);
-        assert.deepEqual(bonsai.siblings('2', ['id', 'uri', 'filename']), []);
-        assert.deepEqual(bonsai.siblings('3', ['id', 'uri', 'filename']), [{
+        assert.deepEqual(bonsai.siblings('1', { payload: ['id', 'uri', 'filename'] }), []);
+        assert.deepEqual(bonsai.siblings('2', { payload: ['id', 'uri', 'filename'] }), []);
+        assert.deepEqual(bonsai.siblings('3', { payload: ['id', 'uri', 'filename'] }), [{
           id: '4',
           uri: 'file://data/4',
           filename: 'four',
         }]);
-        assert.deepEqual(bonsai.siblings('4', ['id', 'uri', 'filename']), [{
+        assert.deepEqual(bonsai.siblings('4', { payload: ['id', 'uri', 'filename'] }), [{
           id: '3',
           uri: 'file://data/3',
           filename: 'three',
@@ -317,12 +317,12 @@ describe('tree', () => {
       });
 
       it('with query', () => {
-        assert.deepEqual(bonsai.children('1', ['id', 'uri', 'filename']), [{
+        assert.deepEqual(bonsai.children('1', { payload: ['id', 'uri', 'filename'] }), [{
           id: '2',
           uri: 'file://data/2',
           filename: 'two',
         }]);
-        assert.deepEqual(bonsai.children('2', ['id', 'uri', 'filename']), [
+        assert.deepEqual(bonsai.children('2', { payload: ['id', 'uri', 'filename'] }), [
           {
             id: '3',
             uri: 'file://data/3',
@@ -334,8 +334,8 @@ describe('tree', () => {
             filename: 'four',
           }
         ]);
-        assert.deepEqual(bonsai.children('3', ['id', 'uri', 'filename']), []);
-        assert.deepEqual(bonsai.children('4', ['id', 'uri', 'filename']), []);
+        assert.deepEqual(bonsai.children('3', { payload: ['id', 'uri', 'filename'] }), []);
+        assert.deepEqual(bonsai.children('4', { payload: ['id', 'uri', 'filename'] }), []);
       });
 
     });
@@ -354,7 +354,7 @@ describe('tree', () => {
       });
 
       it('node exists; ordered children to leaf', () => {
-        assert.deepEqual(bonsai.descendants('1', ['id', 'uri', 'filename']), [
+        assert.deepEqual(bonsai.descendants('1', { payload: ['id', 'uri', 'filename'] }), [
           {
             id: '2',
             uri: 'file://data/2',
@@ -371,7 +371,7 @@ describe('tree', () => {
             filename: 'four',
           }
         ]);
-        assert.deepEqual(bonsai.descendants('2', ['id', 'uri', 'filename']), [
+        assert.deepEqual(bonsai.descendants('2', { payload: ['id', 'uri', 'filename'] }), [
           {
             id: '3',
             uri: 'file://data/3',
@@ -383,8 +383,8 @@ describe('tree', () => {
             filename: 'four',
           }
         ]);
-        assert.deepEqual(bonsai.descendants('3', ['id', 'uri', 'filename']), []);
-        assert.deepEqual(bonsai.descendants('4', ['id', 'uri', 'filename']), []);
+        assert.deepEqual(bonsai.descendants('3', { payload: ['id', 'uri', 'filename'] }), []);
+        assert.deepEqual(bonsai.descendants('4', { payload: ['id', 'uri', 'filename'] }), []);
       });
 
     });
@@ -403,7 +403,7 @@ describe('tree', () => {
       });
 
       it('with query', () => {
-        assert.deepEqual(bonsai.lineage('1', ['id', 'uri', 'filename']), [
+        assert.deepEqual(bonsai.lineage('1', { payload: ['id', 'uri', 'filename'] }), [
           {
             id: '2',
             uri: 'file://data/2',
@@ -420,7 +420,7 @@ describe('tree', () => {
             filename: 'four',
           }
         ]);
-        assert.deepEqual(bonsai.lineage('2', ['id', 'uri', 'filename']), [
+        assert.deepEqual(bonsai.lineage('2', { payload: ['id', 'uri', 'filename'] }), [
           {
             id: '1',
             uri: 'file://data/1',
@@ -437,7 +437,7 @@ describe('tree', () => {
             filename: 'four',
           }
         ]);
-        assert.deepEqual(bonsai.lineage('3', ['id', 'uri', 'filename']), [
+        assert.deepEqual(bonsai.lineage('3', { payload: ['id', 'uri', 'filename'] }), [
           {
             id: '1',
             uri: 'file://data/1',
@@ -449,7 +449,7 @@ describe('tree', () => {
             filename: 'two',
           },
         ]);
-        assert.deepEqual(bonsai.lineage('4', ['id', 'uri', 'filename']), [
+        assert.deepEqual(bonsai.lineage('4', { payload: ['id', 'uri', 'filename'] }), [
           {
             id: '1',
             uri: 'file://data/1',
@@ -480,6 +480,203 @@ describe('tree', () => {
 
     });
 
+    describe('query opts', () => {
+
+      describe('filter', () => {
+
+        it('ancestors with filter: relation list is not filtered; full ancestors returned', () => {
+          // Tree methods do not apply filter to the relation ID list; filter is only passed through to get().
+          assert.deepEqual(bonsai.ancestors('4'), ['1', '2']);
+          const withFilter = bonsai.ancestors('4', { filter: { filename: 'one' } });
+          assert.deepEqual(withFilter, ['1', '2'], 'filter does not restrict relation list; both ancestors returned');
+        });
+
+        it('root with filter: filter is ignored; same root returned', () => {
+          assert.strictEqual(bonsai.root(), '1');
+          const withFilter = bonsai.root({ filter: { filename: 'two' } });
+          assert.strictEqual(typeof withFilter === 'object' ? (withFilter as Node).id : withFilter, '1', 'filter ignored; same root');
+        });
+
+        it('orphans with filter: relation list is not filtered; full orphan list returned', () => {
+          assert.deepEqual(bonsai.orphans(bonsai.all()), ['5']);
+          const withFilter = bonsai.orphans(bonsai.all(), { filter: { filename: 'five' } });
+          assert.deepEqual(withFilter, ['5'], 'filter does not restrict which nodes are orphans');
+        });
+
+        it('parent with filter: filter is ignored; same parent returned', () => {
+          assert.strictEqual(bonsai.parent('2'), '1');
+          assert.strictEqual(bonsai.parent('2', { filter: { nodeType: NODE.TYPE.ENTRY } }), '1', 'filter ignored');
+        });
+
+        it('siblings with filter: relation list is not filtered; full siblings returned', () => {
+          assert.deepEqual(bonsai.siblings('3'), ['4']);
+          const withFilter = bonsai.siblings('3', { filter: { filename: 'four' } });
+          assert.deepEqual(withFilter, ['4'], 'filter does not restrict relation list');
+        });
+
+        it('children with filter: relation list is not filtered; full children returned', () => {
+          assert.deepEqual(bonsai.children('2'), ['3', '4']);
+          const withFilter = bonsai.children('2', { filter: { filename: 'three' } });
+          assert.deepEqual(withFilter, ['3', '4'], 'filter does not restrict relation list; both children returned');
+        });
+
+        it('descendants with filter: relation list is not filtered; full descendants returned', () => {
+          assert.deepEqual(bonsai.descendants('1'), ['2', '3', '4']);
+          const withFilter = bonsai.descendants('1', { filter: { filename: 'two' } });
+          assert.strictEqual(withFilter!.length, 3, 'filter does not restrict relation list');
+        });
+
+        it('lineage with filter: relation list is not filtered; full lineage returned', () => {
+          const noFilter = bonsai.lineage('3') as string[];
+          const withFilter = bonsai.lineage('3', { filter: { filename: 'one' } }) as string[];
+          assert.deepEqual(withFilter, noFilter, 'filter does not restrict relation list');
+        });
+
+      });
+
+      describe('payload', () => {
+
+        it('ancestors with payload nodekind', () => {
+          assert.deepEqual(bonsai.ancestors('4', { payload: QUERY_TYPE.NODEKIND }), [NODE.KIND.DOC, NODE.KIND.DOC]);
+        });
+
+        it('ancestors with payload nodetype', () => {
+          assert.deepEqual(bonsai.ancestors('4', { payload: QUERY_TYPE.NODETYPE }), [NODE.TYPE.DEFAULT, NODE.TYPE.DEFAULT]);
+        });
+
+        it('ancestors with payload data', () => {
+          const out = bonsai.ancestors('4', { payload: QUERY_TYPE.DATA }) as any[];
+          assert.strictEqual(out.length, 2);
+          assert.deepEqual(out[0], { uri: 'file://data/1', filename: 'one', title: 'One' });
+          assert.deepEqual(out[1], { uri: 'file://data/2', filename: 'two', title: 'Two' });
+        });
+
+        it('children with payload single key', () => {
+          assert.deepEqual(bonsai.children('1', { payload: 'filename' }), ['two']);
+          assert.deepEqual(bonsai.children('2', { payload: 'filename' }), ['three', 'four']);
+        });
+
+        it('parent with payload data', () => {
+          assert.deepEqual(bonsai.parent('2', { payload: QUERY_TYPE.DATA }), {
+            uri: 'file://data/1',
+            filename: 'one',
+            title: 'One',
+          });
+        });
+
+        it('lineage with payload string[]', () => {
+          const out = bonsai.lineage('3', { payload: ['id', 'filename'] }) as any[];
+          const ids = out.map((o: any) => o.id).sort();
+          assert.ok(ids.length >= 2);
+          assert.ok(ids.includes('1') && ids.includes('2'));
+        });
+
+      });
+
+      describe('tree method payloads', () => {
+
+        it('root payload node', () => {
+          const out = bonsai.root({ payload: QUERY_TYPE.NODE }) as Node;
+          assert.ok(out && out.id === '1' && out.data);
+        });
+
+        it('root payload filename', () => {
+          assert.strictEqual(bonsai.root({ payload: 'filename' }), 'one');
+        });
+
+        it('parent payload node', () => {
+          const out = bonsai.parent('2', { payload: QUERY_TYPE.NODE }) as Node;
+          assert.ok(out && out.id === '1');
+        });
+
+        it('parent payload filename', () => {
+          assert.strictEqual(bonsai.parent('2', { payload: 'filename' }), 'one');
+        });
+
+        it('children payload node', () => {
+          const out = bonsai.children('1', { payload: QUERY_TYPE.NODE }) as Node[];
+          assert.strictEqual(out.length, 1);
+          assert.strictEqual(out[0].id, '2');
+        });
+
+        it('children payload filename', () => {
+          assert.deepEqual(bonsai.children('2', { payload: 'filename' }), ['three', 'four']);
+        });
+
+        it('siblings payload node', () => {
+          const out = bonsai.siblings('3', { payload: QUERY_TYPE.NODE }) as Node[];
+          assert.strictEqual(out.length, 1);
+          assert.strictEqual(out[0].id, '4');
+        });
+
+        it('ancestors payload node', () => {
+          const out = bonsai.ancestors('4', { payload: QUERY_TYPE.NODE }) as Node[];
+          assert.strictEqual(out.length, 2);
+          assert.strictEqual(out[0].id, '1');
+          assert.strictEqual(out[1].id, '2');
+        });
+
+        it('ancestors payload filename', () => {
+          assert.deepEqual(bonsai.ancestors('4', { payload: 'filename' }), ['one', 'two']);
+        });
+
+        it('descendants payload node', () => {
+          const out = bonsai.descendants('1', { payload: QUERY_TYPE.NODE }) as Node[];
+          assert.strictEqual(out.length, 3);
+          assert.ok(out.some((n: Node) => n.id === '2') && out.some((n: Node) => n.id === '3') && out.some((n: Node) => n.id === '4'));
+        });
+
+        it('lineage payload node', () => {
+          const out = bonsai.lineage('3', { payload: QUERY_TYPE.NODE }) as Node[];
+          assert.ok(out.length >= 2);
+          assert.ok(out.some((n: Node) => n.id === '1') && out.some((n: Node) => n.id === '2'));
+        });
+
+        it('orphans payload node', () => {
+          const allIds = bonsai.all({ payload: QUERY_TYPE.ID }) as string[];
+          const out = bonsai.orphans(allIds, { payload: QUERY_TYPE.NODE }) as Node[];
+          assert.ok(Array.isArray(out));
+          assert.ok(out.every((n: Node) => n && n.id));
+        });
+
+      });
+
+      describe('tree method filters', () => {
+
+        it('children with filter returns full list; filter not applied', () => {
+          bonsai.index['2'].type = 'entry';
+          bonsai.index['3'].type = 'entry';
+          bonsai.index['4'].type = 'index';
+          const out = bonsai.children('2', { filter: { nodeType: 'entry' } }) as string[];
+          assert.strictEqual(out.length, 2, 'filter does not restrict relation list; both children returned');
+          assert.ok(out.includes('3') && out.includes('4'));
+        });
+
+        it('descendants with filter returns full list; filter not applied', () => {
+          bonsai.index['2'].type = 'entry';
+          bonsai.index['3'].type = 'index';
+          bonsai.index['4'].type = 'entry';
+          const out = bonsai.descendants('1', { filter: { nodeType: 'entry' } }) as string[];
+          assert.strictEqual(out!.length, 3, 'filter does not restrict relation list');
+        });
+
+        it('ancestors with filter returns full list; filter not applied', () => {
+          bonsai.index['1'].type = 'entry';
+          bonsai.index['2'].type = 'index';
+          const out = bonsai.ancestors('4', { filter: { nodeKind: NODE.KIND.DOC } }) as string[];
+          assert.deepEqual(out, ['1', '2'], 'filter does not restrict relation list');
+        });
+
+        it('children ignores filter header', () => {
+          const unfiltered = bonsai.children('2');
+          const withHeader = bonsai.children('2', { filter: { header: 'x' } });
+          assert.deepEqual(withHeader, unfiltered, 'filter.header ignored; same result as unfiltered');
+        });
+
+      });
+
+    });
+
   });
 
   describe('methods', () => {
@@ -502,7 +699,7 @@ describe('tree', () => {
 
         it('root set', () => {
           assert.deepEqual(bonsai.root(), '1');
-          assert.deepEqual(bonsai.root('node'), {
+          assert.deepEqual(bonsai.root({ payload: QUERY_TYPE.NODE }), {
             id: '1',
             kind: NODE.KIND.DOC,
             type: NODE.TYPE.DEFAULT,
@@ -904,7 +1101,7 @@ describe('tree', () => {
 
       describe('flushRelFams()', () => {
 
-        it(NODE.TYPE.DEFAULT, () => {
+        it('clears tree relationship refs', () => {
           // setup
           const testNode1: Node | undefined = bonsai.get('1');
           const testNode2: Node | undefined = bonsai.get('2');

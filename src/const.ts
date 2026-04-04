@@ -73,6 +73,7 @@ export namespace REL {
     HEADER  = 'header',
     // BLOCK   = 'block',
   }
+
 }
 
 export enum QUERY_TYPE {

@@ -348,10 +348,4 @@ Transfer the relationships from the `source` node to the `target` node via their
 
 Disconnect a `source` node id from a `target` node id of the given `ref` kind (`attr` or `link`) and `type` text.
 
-## TODO
-
-- https://github.com/stopachka/datalogJS
-- https://github.com/pouchdb/pouchdb
-
-
 [^inspire]: Logo inspired by [databases](https://cdn-icons-png.flaticon.com/512/20/20093.png) and [caudexes](https://www.google.com/search?q=caudex&source=lnms&tbm=isch&sa=X&ved=2ahUKEwiD_LbPwr36AhUsRTABHdXOBq0Q_AUoAXoECAIQAw&biw=1011&bih=800&dpr=2) -- especially [this one](https://thumbs.dreamstime.com/z/adenium-shrub-branched-caudex-green-foliage-illustration-colored-pencils-229255411.jpg).
