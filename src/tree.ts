@@ -219,6 +219,7 @@ export function Tree<TBase extends Mixin>(Base: TBase) {
 
     public flushRelFams(): boolean {
       this.checkLock();
+      this.invalidateBackRefs();
       for (const node of (this.all({ payload: QUERY_TYPE.NODE }) as Node[] ?? [])) {
         const isZombie: boolean = (node.kind === NODE.KIND.ZOMBIE);
         /* eslint-disable indent */

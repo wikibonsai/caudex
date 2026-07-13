@@ -110,14 +110,15 @@ export function Web<TBase extends Mixin>(Base: TBase) {
         throw new Error('attrs do not support headers');
       }
       if (!this.has(id)) { return undefined; }
+      this.ensureBackRefs();
       const backattrs: Attrs = {} as Attrs;
-      for (const node of (this.all({ payload: QUERY_TYPE.NODE }) as Node[] ?? [])) {
-        if (node.inAttrs(id)) {
-          for (const [type, ids] of Object.entries(node.attrs)) {
-            if (ids.has(id)) {
-              if (!backattrs[type]) { backattrs[type] = new Set(); }
-              backattrs[type].add(node.id);
-            }
+      for (const sourceID of (this.backRefs.attr.get(id) ?? new Set<string>())) {
+        const node: Node | undefined = this.index[sourceID];
+        if (!node) { continue; }
+        for (const [type, ids] of Object.entries(node.attrs)) {
+          if (ids.has(id)) {
+            if (!backattrs[type]) { backattrs[type] = new Set(); }
+            backattrs[type].add(node.id);
           }
         }
       }
@@ -155,22 +156,23 @@ export function Web<TBase extends Mixin>(Base: TBase) {
     backlinks(id: string, opts?: QueryOpts): Links | [any, any][] | undefined {
       this.checkLock();
       if (!this.has(id)) { return undefined; }
+      this.ensureBackRefs();
       const backlinks: Links = [];
-      for (const node of (this.all({ payload: QUERY_TYPE.NODE }) as Node[] ?? [])) {
-        if (node.inLinks(id)) {
-          for (const link of node.links) {
-            if (id !== link.id) { continue; }
-            const f = opts?.filter;
-            if (f?.header !== undefined && link.header !== f.header) { continue; }
-            if (f?.level === REL.LEVEL.FILE && link.header) { continue; }
-            if (f?.level === REL.LEVEL.HEADER && !link.header) { continue; }
-            if (f?.type !== undefined && link.type !== f.type) { continue; }
-            backlinks.push({
-              type: link.type,
-              id: node.id,
-              ...(link.header !== undefined && { header: link.header }),
-            } as Link);
-          }
+      for (const sourceID of (this.backRefs.link.get(id) ?? new Set<string>())) {
+        const node: Node | undefined = this.index[sourceID];
+        if (!node) { continue; }
+        for (const link of node.links) {
+          if (id !== link.id) { continue; }
+          const f = opts?.filter;
+          if (f?.header !== undefined && link.header !== f.header) { continue; }
+          if (f?.level === REL.LEVEL.FILE && link.header) { continue; }
+          if (f?.level === REL.LEVEL.HEADER && !link.header) { continue; }
+          if (f?.type !== undefined && link.type !== f.type) { continue; }
+          backlinks.push({
+            type: link.type,
+            id: node.id,
+            ...(link.header !== undefined && { header: link.header }),
+          } as Link);
         }
       }
       const payload = opts?.payload ?? QUERY_TYPE.ID;
@@ -199,21 +201,22 @@ export function Web<TBase extends Mixin>(Base: TBase) {
     backembeds(id: string, opts?: QueryOpts): Embeds | any[] | undefined {
       this.checkLock();
       if (!this.has(id)) { return undefined; }
+      this.ensureBackRefs();
       const backembeds: Embeds = [];
-      for (const node of (this.all({ payload: QUERY_TYPE.NODE }) as Node[] ?? [])) {
-        if (node.inEmbeds(id)) {
-          for (const embed of node.embeds) {
-            if (id !== embed.id) { continue; }
-            const f = opts?.filter;
-            if (f?.header !== undefined && embed.header !== f.header) { continue; }
-            if (f?.level === REL.LEVEL.FILE && embed.header) { continue; }
-            if (f?.level === REL.LEVEL.HEADER && !embed.header) { continue; }
-            backembeds.push({
-              id: node.id,
-              media: embed.media ?? NODE.MEDIA.MARKDOWN,
-              ...(embed.header !== undefined && { header: embed.header }),
-            } as Embed);
-          }
+      for (const sourceID of (this.backRefs.embed.get(id) ?? new Set<string>())) {
+        const node: Node | undefined = this.index[sourceID];
+        if (!node) { continue; }
+        for (const embed of node.embeds) {
+          if (id !== embed.id) { continue; }
+          const f = opts?.filter;
+          if (f?.header !== undefined && embed.header !== f.header) { continue; }
+          if (f?.level === REL.LEVEL.FILE && embed.header) { continue; }
+          if (f?.level === REL.LEVEL.HEADER && !embed.header) { continue; }
+          backembeds.push({
+            id: node.id,
+            media: embed.media ?? NODE.MEDIA.MARKDOWN,
+            ...(embed.header !== undefined && { header: embed.header }),
+          } as Embed);
         }
       }
       const payload = opts?.payload ?? QUERY_TYPE.ID;
@@ -256,6 +259,7 @@ export function Web<TBase extends Mixin>(Base: TBase) {
 
     public flushRelRefs(id?: string): boolean {
       this.checkLock();
+      this.invalidateBackRefs();
       // single
       if (id) {
         const node: Node | undefined = this.get(id);
@@ -306,10 +310,10 @@ export function Web<TBase extends Mixin>(Base: TBase) {
     public connect(sourceID: string, targetID: string, optsOrKind: ConnectOpts | REL.REF, typeOrMedia?: string): boolean {
       const opts: ConnectOpts = (typeof optsOrKind === 'string' && Object.values(REL.REF).includes(optsOrKind))
         ? {
-            kind: optsOrKind,
-            type: optsOrKind === REL.REF.EMBED ? undefined : (typeOrMedia ?? ''),
-            media: optsOrKind === REL.REF.EMBED ? (typeOrMedia as NODE.MEDIA) ?? NODE.MEDIA.MARKDOWN : undefined,
-          }
+          kind: optsOrKind,
+          type: optsOrKind === REL.REF.EMBED ? undefined : (typeOrMedia ?? ''),
+          media: optsOrKind === REL.REF.EMBED ? (typeOrMedia as NODE.MEDIA) ?? NODE.MEDIA.MARKDOWN : undefined,
+        }
         : optsOrKind as ConnectOpts;
       const { kind, type = '', header, media } = opts;
       if (kind === REL.REF.REF) {
@@ -320,6 +324,7 @@ export function Web<TBase extends Mixin>(Base: TBase) {
         throw new Error('attrs do not support headers');
       }
       this.checkLock();
+      this.invalidateBackRefs();
       const sourceNode: Node | undefined = this.get(sourceID, { payload: QUERY_TYPE.NODE });
       if (!sourceNode) {
         console.warn(`source node with id "${sourceID}" not found`);
@@ -376,10 +381,10 @@ export function Web<TBase extends Mixin>(Base: TBase) {
     public disconnect(sourceID: string, targetID: string, optsOrKind: DisconnectOpts | REL.REF, typeOrMedia?: string): boolean {
       const opts: DisconnectOpts = (typeof optsOrKind === 'string' && Object.values(REL.REF).includes(optsOrKind))
         ? {
-            kind: optsOrKind,
-            type: optsOrKind === REL.REF.EMBED ? undefined : (typeOrMedia ?? ''),
-            media: optsOrKind === REL.REF.EMBED ? (typeOrMedia as NODE.MEDIA) ?? NODE.MEDIA.MARKDOWN : undefined,
-          }
+          kind: optsOrKind,
+          type: optsOrKind === REL.REF.EMBED ? undefined : (typeOrMedia ?? ''),
+          media: optsOrKind === REL.REF.EMBED ? (typeOrMedia as NODE.MEDIA) ?? NODE.MEDIA.MARKDOWN : undefined,
+        }
         : optsOrKind as DisconnectOpts;
       const { kind, type = '', header, media } = opts;
       if (kind === REL.REF.REF) {
@@ -387,6 +392,7 @@ export function Web<TBase extends Mixin>(Base: TBase) {
         return false;
       }
       this.checkLock();
+      this.invalidateBackRefs();
       const sourceNode: Node | undefined = this.get(sourceID, { payload: QUERY_TYPE.NODE });
       if (!sourceNode) {
         console.warn(`source node with id "${sourceID}" not found`);
@@ -438,6 +444,7 @@ export function Web<TBase extends Mixin>(Base: TBase) {
       kind: REL.REF = REL.REF.REF,
     ): boolean {
       this.checkLock();
+      this.invalidateBackRefs();
       const retypes: boolean[] = [];
       for (const node of (this.all({ payload: QUERY_TYPE.NODE }) as Node[] ?? [])) {
         if ((kind === REL.REF.REF) || (kind === REL.REF.ATTR)) {
@@ -466,6 +473,7 @@ export function Web<TBase extends Mixin>(Base: TBase) {
       kind: REL.REF = REL.REF.REF,
     ): boolean {
       this.checkLock();
+      this.invalidateBackRefs();
       if (sourceID === targetID) {
         console.warn('source and target are the same');
         return false;
@@ -503,6 +511,41 @@ export function Web<TBase extends Mixin>(Base: TBase) {
         sourceNode.embeds = [] as Embeds;
       }
       return true;
+    }
+
+    // back-ref (inverse) index
+    //
+    // 'backRefs.<kind>' maps 'targetId -> Set<sourceId>' for the sources that
+    // reference a target. it stores only WHICH sources point at a target, not
+    // the type/header/media of the edge -- those stay authoritative on the
+    // source node and are read back during query reconstruction, so retype/edit
+    // can never desync this cache. it is a pure derivation of the forward refs,
+    // rebuilt from a full scan whenever dirty (invalidated on any mutation).
+
+    public rebuildBackRefs(): void {
+      const attr = new Map<string, Set<string>>();
+      const link = new Map<string, Set<string>>();
+      const embed = new Map<string, Set<string>>();
+      const addTo = (m: Map<string, Set<string>>, target: string, source: string): void => {
+        let sources = m.get(target);
+        if (!sources) { sources = new Set<string>(); m.set(target, sources); }
+        sources.add(source);
+      };
+      // iterate in index-insertion order so each target's source Set is ordered
+      // the same way the previous full-scan implementation emitted them.
+      for (const node of Object.values(this.index)) {
+        for (const ids of Object.values(node.attrs)) {
+          for (const targetID of ids) { addTo(attr, targetID, node.id); }
+        }
+        for (const l of node.links) { addTo(link, l.id, node.id); }
+        for (const e of node.embeds) { addTo(embed, e.id, node.id); }
+      }
+      this.backRefs = { attr, link, embed };
+      this.backRefsDirty = false;
+    }
+
+    public ensureBackRefs(): void {
+      if (this.backRefsDirty) { this.rebuildBackRefs(); }
     }
 
   };

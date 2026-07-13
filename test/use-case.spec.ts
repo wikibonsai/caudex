@@ -275,6 +275,102 @@ describe('use-case', () => {
   });
 
   // ---------------------------------------------------------------------------
+  // back-view freshness across mutations
+  //
+  // the back-views (backlinks / backattrs / backembeds) must reflect the CURRENT
+  // forward refs after any mutation -- i.e. a back-view read, then a mutation,
+  // then a re-read must show the change. (this is the property an inverse-ref
+  // cache has to preserve: a mutation must never leave a stale back-view.)
+  // ---------------------------------------------------------------------------
+
+  describe('back-views stay fresh across mutations', () => {
+
+    it('a newly connected source appears in a re-read of backlinks', () => {
+      // read backlinks BEFORE the new link exists...
+      assert.deepEqual(wb.backlinks('2'), [] as Links);
+      // ...user adds `[[two]]` in `one.md`...
+      wb.connect('1', '2', REL.REF.LINK, 'linktype');
+      // ...the re-read now includes it (no stale empty result)
+      assert.deepEqual(wb.backlinks('2'), [{ type: 'linktype', id: '1' }] as Links);
+    });
+
+    it('a disconnected source drops out of a re-read of backlinks', () => {
+      wb.connect('1', '2', REL.REF.LINK, 'linktype');
+      wb.connect('3', '2', REL.REF.LINK, 'linktype');
+      // read with both sources present...
+      assert.deepEqual(wb.backlinks('2'), [
+        { type: 'linktype', id: '1' },
+        { type: 'linktype', id: '3' },
+      ] as Links);
+      // ...remove one...
+      wb.disconnect('1', '2', REL.REF.LINK, 'linktype');
+      // ...only the remaining source is reported
+      assert.deepEqual(wb.backlinks('2'), [{ type: 'linktype', id: '3' }] as Links);
+    });
+
+  });
+
+  // ---------------------------------------------------------------------------
+  // multiple referrers to one target
+  //
+  // a target commonly has many incoming refs. backlinks() reports them in index
+  // order; backattrs() aggregates them per type into a single Set.
+  // ---------------------------------------------------------------------------
+
+  describe('a target referenced by several files', () => {
+
+    it('backlinks lists every referrer, in index order', () => {
+      // connect out of index order (3 before 1) to prove the result follows
+      // index order, not connect order
+      wb.connect('3', '2', REL.REF.LINK, 'linktype');
+      wb.connect('1', '2', REL.REF.LINK, 'linktype');
+      assert.deepEqual(wb.backlinks('2'), [
+        { type: 'linktype', id: '1' },
+        { type: 'linktype', id: '3' },
+      ] as Links);
+    });
+
+    it('backattrs aggregates every referrer of a type into one Set', () => {
+      wb.connect('1', '2', REL.REF.ATTR, 'tags');
+      wb.connect('3', '2', REL.REF.ATTR, 'tags');
+      assert.deepEqual(wb.backattrs('2'), { tags: new Set(['1', '3']) } as Attrs);
+    });
+
+    it('backembeds lists every embedder, and clears when they are removed', () => {
+      wb.connect('1', '2', REL.REF.EMBED);
+      wb.connect('3', '2', REL.REF.EMBED);
+      assert.deepEqual(wb.backembeds('2'), [
+        { media: NODE.MEDIA.MARKDOWN, id: '1' },
+        { media: NODE.MEDIA.MARKDOWN, id: '3' },
+      ] as Embeds);
+      // remove one embedder's refs (as an edit-body flush would)
+      wb.flushRelRefs('1');
+      assert.deepEqual(wb.backembeds('2'), [{ media: NODE.MEDIA.MARKDOWN, id: '3' }] as Embeds);
+    });
+
+  });
+
+  // ---------------------------------------------------------------------------
+  // neighbors spans both directions and all three ref kinds
+  //
+  // neighbors() is the building block for isolates(); it must union a node's
+  // outgoing refs with its incoming refs across links, attrs, and embeds.
+  // ---------------------------------------------------------------------------
+
+  describe('neighbors span both directions and every ref kind', () => {
+
+    it('unions outbound + inbound across link, attr, and embed', () => {
+      wb.connect('2', '3', REL.REF.LINK, 'linktype');  // 2 -> 3 (outbound link)
+      wb.connect('1', '2', REL.REF.LINK, 'linktype');  // 1 -> 2 (inbound link)
+      wb.connect('2', '4', REL.REF.ATTR, 'tags');      // 2 -> 4 (outbound attr)
+      wb.connect('1', '2', REL.REF.EMBED);             // 1 -> 2 (inbound embed)
+      // every counterpart, either direction, is a neighbor of `2`
+      assert.deepEqual(new Set(wb.neighbors('2')), new Set(['1', '3', '4']));
+    });
+
+  });
+
+  // ---------------------------------------------------------------------------
   // attributes (caml) and embeds
   //
   // caml `: key :: [[value]]` === connect(..., ATTR, key).
@@ -431,12 +527,16 @@ describe('use-case', () => {
       assert.deepEqual(wb.foreattrs('1'), { topics: new Set(['2']) } as Attrs);
       assert.deepEqual(wb.foreattrs('3'), { topics: new Set(['2']) } as Attrs);
       assert.deepEqual([...wb.attrtypes()], ['topics']);
+      // the back-view reflects the new key too (not the stale `tags`)
+      assert.deepEqual(wb.backattrs('2'), { topics: new Set(['1', '3']) } as Attrs);
     });
 
     it('retypes a link type everywhere it appears', () => {
       wb.connect('1', '2', REL.REF.LINK, 'rel');
       assert.strictEqual(wb.retype('rel', 'relates', REL.REF.LINK), true);
       assert.deepEqual(wb.forelinks('1'), [{ type: 'relates', id: '2' }] as Links);
+      // the back-view carries the new type
+      assert.deepEqual(wb.backlinks('2'), [{ type: 'relates', id: '1' }] as Links);
     });
 
   });
@@ -554,6 +654,10 @@ describe('use-case', () => {
       // ...and two has been emptied of them
       assert.deepEqual(wb.forelinks('2'), [] as Links);
       assert.deepEqual(wb.foreattrs('2'), {} as Attrs);
+      // ...and the MOVED targets now report the new owner as their referrer
+      // (the inbound edge's source changed from two -> one)
+      assert.deepEqual(wb.backlinks('3'), [{ type: 'linktype', id: '1' }] as Links);
+      assert.deepEqual(wb.backattrs('4'), { tags: new Set(['1']) } as Attrs);
     });
 
   });

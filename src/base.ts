@@ -29,6 +29,15 @@ export class Base {
   public lock: Mutex;                                                    // the actual mutex lock
   // id opts
   public nanoidOpts: any;                                                // nanoid options
+  // back-ref (inverse) index -- a derived cache over the authoritative forward
+  // refs (see web.ts). 'targetId -> Set<sourceId>' per ref kind, rebuilt lazily
+  // from a full scan whenever 'backRefsDirty', invalidated on any mutation.
+  public backRefs: {
+    attr: Map<string, Set<string>>;
+    link: Map<string, Set<string>>;
+    embed: Map<string, Set<string>>;
+  };
+  public backRefsDirty: boolean;
 
   constructor(items: BaseNodeData[] | any[], opts?: Partial<CaudexOpts>) {
     // go
@@ -63,6 +72,8 @@ export class Base {
     }
     // init items; populate nodes
     this.index = {};
+    this.backRefs = { attr: new Map(), link: new Map(), embed: new Map() };
+    this.backRefsDirty = true;
     const errorItems: any[] = [];
     for (const item of items) {
       const newNode: Node | undefined = this.add(item.data, item.init);
@@ -94,6 +105,12 @@ export class Base {
   public genID() {
     const configdNanoid = this.nanoidOpts ? customAlphabet(this.nanoidOpts.alphabet, this.nanoidOpts.size) : nanoid;
     return configdNanoid();
+  }
+
+  // mark the back-ref index stale; the next back-view query rebuilds it.
+  // called from every method that mutates the node set or forward refs.
+  public invalidateBackRefs(): void {
+    this.backRefsDirty = true;
   }
 
   public print(printout: boolean = true): string {
@@ -170,7 +187,7 @@ export class Base {
 
   public has(id: string): boolean {
     this.checkLock();
-    return Object.keys(this.index).includes(id);
+    return Object.prototype.hasOwnProperty.call(this.index, id);
   }
 
   public flushData(id?: string): boolean {
@@ -192,6 +209,7 @@ export class Base {
 
   public flushRels(): boolean {
     this.checkLock();
+    this.invalidateBackRefs();
     for (const node of (this.all({ payload: QUERY_TYPE.NODE }) as Node[] ?? [])) {
       // delete zombies
       if (node.kind === NODE.KIND.ZOMBIE) {
@@ -206,6 +224,7 @@ export class Base {
 
   public clear(): void {
     this.checkLock();
+    this.invalidateBackRefs();
     this.index = {};
   }
 
@@ -238,6 +257,7 @@ export class Base {
   public add(data: string): Node;                                                        // zombie-case
   public add(data: BaseNodeData | any, init?: Partial<InitNodeType>): Node | undefined {
     this.checkLock();
+    this.invalidateBackRefs();
     // does id exist?
     if (data.id && this.has(data.id)) {
       console.warn(`node with id "${data.id}" already exists`);
@@ -310,6 +330,7 @@ export class Base {
 
   public fill(id: string, data: BaseNodeData | any): Node | undefined {
     this.checkLock();
+    this.invalidateBackRefs();
     if (!this.has(id) && !(data.id && this.has(data.id))) {
       console.warn(`node with id "${id}" does not exist`);
       return undefined;
@@ -411,6 +432,7 @@ export class Base {
       console.warn(`node with id "${id}" does not exist`);
       return false;
     }
+    this.invalidateBackRefs();
     const hasRel: boolean = (this.all({ payload: QUERY_TYPE.NODE }) as Node[] ?? []).some((n) =>
       (n.id !== id) && (n.inChildren(id) || n.inAttrs(id) || n.inLinks(id))
     );
