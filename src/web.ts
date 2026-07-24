@@ -8,26 +8,26 @@ export function Web<TBase extends Mixin>(Base: TBase) {
 
     // back-ref (inverse) index — a derived cache over the authoritative forward refs.
     // 'targetId -> Set<sourceId>' per ref kind, rebuilt lazily from a full scan when
-    // 'backRefsDirty'. Lives in the WEB mixin (only web queries read it — backlinks /
+    // 'backRefsIndexDirty'. Lives in the WEB mixin (only web queries read it — backlinks /
     // backattrs / backembeds); field-initialized because Web has no constructor.
-    public backRefs: {
+    public backRefsIndex: {
       attr: Map<string, Set<string>>;
       link: Map<string, Set<string>>;
       embed: Map<string, Set<string>>;
     } = { attr: new Map(), link: new Map(), embed: new Map() };
-    public backRefsDirty: boolean = true;
+    public backRefsIndexDirty: boolean = true;
 
     // mark the back-ref index stale; the next back-view query rebuilds it.
-    public invalidateBackRefs(): void {
-      this.backRefsDirty = true;
+    public invalidateBackRefsIndex(): void {
+      this.backRefsIndexDirty = true;
     }
 
     // any base-level mutation (add / rm / fill / clear / flushRels) can change the
-    // forward refs → stale backRefs. Hook base's onMutate, chaining super so the
+    // forward refs → stale backRefsIndex. Hook base's onMutate, chaining super so the
     // tree mixin's parentIndex invalidation still runs.
     public onMutate(): void {
       super.onMutate();
-      this.invalidateBackRefs();
+      this.invalidateBackRefsIndex();
     }
 
     // properties
@@ -100,12 +100,21 @@ export function Web<TBase extends Mixin>(Base: TBase) {
     // forerefs(id: string, query: string | string[] = QueryType.id): Attrs | Record<string, Node[]> | Record<string, any> | undefined {
     // }
 
-    // backrefs(id: string, query?: QueryType.id): Attrs | undefined;
-    // backrefs(id: string, query: QueryType.node): Record<string, Node[]> | undefined;
-    // backrefs(id: string, query: string | string[]): Record<string, any> | undefined;
-    // // define
-    // backrefs(id: string, query: string | string[] = QueryType.id): Attrs | Record<string, Node[]> | Record<string, any> | undefined {
-    // }
+    // all nodes that reference `id` via ANY ref kind (attr / link / embed) — the union
+    // of backattrs/backlinks/backembeds sources, read straight off the backRefsIndex.
+    // Parallels tree.parent(): an O(1)/O(k) index-backed query (ensure → lookup → get).
+    backrefs(id: string, opts?: QueryOpts): string[] | Node[] | any[] | undefined {
+      this.checkLock();
+      if (!this.has(id)) { return undefined; }
+      this.ensureBackRefsIndex();
+      const sources: Set<string> = new Set<string>();
+      for (const kindMap of [this.backRefsIndex.attr, this.backRefsIndex.link, this.backRefsIndex.embed]) {
+        for (const sourceID of (kindMap.get(id) ?? new Set<string>())) { sources.add(sourceID); }
+      }
+      const ids: string[] = [...sources];
+      const payload = opts?.payload ?? QUERY_TYPE.ID;
+      return (payload === QUERY_TYPE.ID || payload === undefined) ? ids : ids.map((sid) => this.get(sid, { ...opts, payload }));
+    }
 
     foreattrs(id: string, opts?: QueryOpts): Attrs | Record<string, Node[]> | Record<string, any> | undefined {
       this.checkLock();
@@ -134,9 +143,9 @@ export function Web<TBase extends Mixin>(Base: TBase) {
         throw new Error('attrs do not support headers');
       }
       if (!this.has(id)) { return undefined; }
-      this.ensureBackRefs();
+      this.ensureBackRefsIndex();
       const backattrs: Attrs = {} as Attrs;
-      for (const sourceID of (this.backRefs.attr.get(id) ?? new Set<string>())) {
+      for (const sourceID of (this.backRefsIndex.attr.get(id) ?? new Set<string>())) {
         const node: Node | undefined = this.index[sourceID];
         if (!node) { continue; }
         for (const [type, ids] of Object.entries(node.attrs)) {
@@ -180,9 +189,9 @@ export function Web<TBase extends Mixin>(Base: TBase) {
     backlinks(id: string, opts?: QueryOpts): Links | [any, any][] | undefined {
       this.checkLock();
       if (!this.has(id)) { return undefined; }
-      this.ensureBackRefs();
+      this.ensureBackRefsIndex();
       const backlinks: Links = [];
-      for (const sourceID of (this.backRefs.link.get(id) ?? new Set<string>())) {
+      for (const sourceID of (this.backRefsIndex.link.get(id) ?? new Set<string>())) {
         const node: Node | undefined = this.index[sourceID];
         if (!node) { continue; }
         for (const link of node.links) {
@@ -225,9 +234,9 @@ export function Web<TBase extends Mixin>(Base: TBase) {
     backembeds(id: string, opts?: QueryOpts): Embeds | any[] | undefined {
       this.checkLock();
       if (!this.has(id)) { return undefined; }
-      this.ensureBackRefs();
+      this.ensureBackRefsIndex();
       const backembeds: Embeds = [];
-      for (const sourceID of (this.backRefs.embed.get(id) ?? new Set<string>())) {
+      for (const sourceID of (this.backRefsIndex.embed.get(id) ?? new Set<string>())) {
         const node: Node | undefined = this.index[sourceID];
         if (!node) { continue; }
         for (const embed of node.embeds) {
@@ -283,7 +292,7 @@ export function Web<TBase extends Mixin>(Base: TBase) {
 
     public flushRelRefs(id?: string): boolean {
       this.checkLock();
-      this.invalidateBackRefs();
+      this.invalidateBackRefsIndex();
       // single
       if (id) {
         const node: Node | undefined = this.get(id);
@@ -348,7 +357,7 @@ export function Web<TBase extends Mixin>(Base: TBase) {
         throw new Error('attrs do not support headers');
       }
       this.checkLock();
-      this.invalidateBackRefs();
+      this.invalidateBackRefsIndex();
       const sourceNode: Node | undefined = this.get(sourceID, { payload: QUERY_TYPE.NODE });
       if (!sourceNode) {
         console.warn(`source node with id "${sourceID}" not found`);
@@ -416,7 +425,7 @@ export function Web<TBase extends Mixin>(Base: TBase) {
         return false;
       }
       this.checkLock();
-      this.invalidateBackRefs();
+      this.invalidateBackRefsIndex();
       const sourceNode: Node | undefined = this.get(sourceID, { payload: QUERY_TYPE.NODE });
       if (!sourceNode) {
         console.warn(`source node with id "${sourceID}" not found`);
@@ -468,7 +477,7 @@ export function Web<TBase extends Mixin>(Base: TBase) {
       kind: REL.REF = REL.REF.REF,
     ): boolean {
       this.checkLock();
-      this.invalidateBackRefs();
+      this.invalidateBackRefsIndex();
       const retypes: boolean[] = [];
       for (const node of (this.all({ payload: QUERY_TYPE.NODE }) as Node[] ?? [])) {
         if ((kind === REL.REF.REF) || (kind === REL.REF.ATTR)) {
@@ -497,7 +506,7 @@ export function Web<TBase extends Mixin>(Base: TBase) {
       kind: REL.REF = REL.REF.REF,
     ): boolean {
       this.checkLock();
-      this.invalidateBackRefs();
+      this.invalidateBackRefsIndex();
       if (sourceID === targetID) {
         console.warn('source and target are the same');
         return false;
@@ -539,14 +548,14 @@ export function Web<TBase extends Mixin>(Base: TBase) {
 
     // back-ref (inverse) index
     //
-    // 'backRefs.<kind>' maps 'targetId -> Set<sourceId>' for the sources that
+    // 'backRefsIndex.<kind>' maps 'targetId -> Set<sourceId>' for the sources that
     // reference a target. it stores only WHICH sources point at a target, not
     // the type/header/media of the edge -- those stay authoritative on the
     // source node and are read back during query reconstruction, so retype/edit
     // can never desync this cache. it is a pure derivation of the forward refs,
     // rebuilt from a full scan whenever dirty (invalidated on any mutation).
 
-    public rebuildBackRefs(): void {
+    public rebuildBackRefsIndex(): void {
       const attr = new Map<string, Set<string>>();
       const link = new Map<string, Set<string>>();
       const embed = new Map<string, Set<string>>();
@@ -564,12 +573,12 @@ export function Web<TBase extends Mixin>(Base: TBase) {
         for (const l of node.links) { addTo(link, l.id, node.id); }
         for (const e of node.embeds) { addTo(embed, e.id, node.id); }
       }
-      this.backRefs = { attr, link, embed };
-      this.backRefsDirty = false;
+      this.backRefsIndex = { attr, link, embed };
+      this.backRefsIndexDirty = false;
     }
 
-    public ensureBackRefs(): void {
-      if (this.backRefsDirty) { this.rebuildBackRefs(); }
+    public ensureBackRefsIndex(): void {
+      if (this.backRefsIndexDirty) { this.rebuildBackRefsIndex(); }
     }
 
   };

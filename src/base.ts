@@ -106,7 +106,7 @@ export class Base {
   }
 
   // Generic "the node set / forward refs changed" hook. Derived-index mixins
-  // (web: backRefs, tree: parentIndex) OVERRIDE this and chain via super() to mark
+  // (web: backRefsIndex, tree: parentIndex) OVERRIDE this and chain via super() to mark
   // their caches stale on any base-level mutation. Base can't reference those
   // indexes directly (it's the innermost mixin), so it just fires this signal.
   public onMutate(): void {}

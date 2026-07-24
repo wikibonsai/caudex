@@ -38,7 +38,7 @@ describe('back-ref index (mechanism)', () => {
     stubNanoid.restore();
   });
 
-  describe('rebuildBackRefs() invariant', () => {
+  describe('rebuildBackRefsIndex() invariant', () => {
 
     it('an explicit rebuild yields the same back-views (deterministic derivation)', () => {
       wb.connect('1', '2', REL.REF.LINK, 'linktype');
@@ -50,7 +50,7 @@ describe('back-ref index (mechanism)', () => {
       const embeds = wb.backembeds('2');
       // force a from-scratch rebuild; the cache must be a pure function of the
       // forward refs, so results are unchanged.
-      wb.rebuildBackRefs();
+      wb.rebuildBackRefsIndex();
       assert.deepEqual(wb.backlinks('2'), links);
       assert.deepEqual(wb.backattrs('2'), attrs);
       assert.deepEqual(wb.backembeds('2'), embeds);
@@ -62,7 +62,7 @@ describe('back-ref index (mechanism)', () => {
 
     it('rebuilds once, then serves from cache until a mutation', () => {
       wb.connect('1', '2', REL.REF.LINK, 'linktype');
-      const spy = sinon.spy(wb, 'rebuildBackRefs');
+      const spy = sinon.spy(wb, 'rebuildBackRefsIndex');
       // first query rebuilds (dirty after the connect)...
       wb.backlinks('2');
       assert.strictEqual(spy.callCount, 1);
@@ -88,10 +88,10 @@ describe('back-ref index (mechanism)', () => {
         ['clear', () => wb.clear()],
       ];
       for (const [name, mutate] of cases) {
-        wb.rebuildBackRefs();                       // warm: dirty -> false
-        assert.strictEqual(wb.backRefsDirty, false);
+        wb.rebuildBackRefsIndex();                       // warm: dirty -> false
+        assert.strictEqual(wb.backRefsIndexDirty, false);
         mutate();
-        assert.strictEqual(wb.backRefsDirty, true, `${name} should invalidate the back-ref cache`);
+        assert.strictEqual(wb.backRefsIndexDirty, true, `${name} should invalidate the back-ref cache`);
       }
     });
 

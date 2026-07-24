@@ -10,7 +10,7 @@ export function Tree<TBase extends Mixin>(Base: TBase) {
     // parent index — 'childId -> parentId', a derived cache over the tree's child
     // pointers so parent()/ancestors()/inTree() are O(1)/O(depth) instead of a full
     // tree walk per call (the graph-lineage + ancestor derives that the app's
-    // caudexRevision storm hammers). Mirrors web's backRefs: lazy, rebuilt when
+    // caudexRevision storm hammers). Mirrors web's backRefsIndex: lazy, rebuilt when
     // dirty, invalidated on any mutation. Field-initialized (Tree has no constructor).
     public parentIndex: Map<string, string> = new Map();
     public parentIndexDirty: boolean = true;
@@ -35,7 +35,7 @@ export function Tree<TBase extends Mixin>(Base: TBase) {
 
     // tree relations change on graft/prune/setRoot/replace AND on base-level node
     // add/rm/clear (a removed parent strands its children), so hook base's onMutate;
-    // chain super so web's backRefs invalidation still runs.
+    // chain super so web's backRefsIndex invalidation still runs.
     public onMutate(): void {
       super.onMutate();
       this.invalidateParentIndex();
@@ -268,7 +268,7 @@ export function Tree<TBase extends Mixin>(Base: TBase) {
       this.checkLock();
       // flushing tree relations strands every child→parent edge → invalidate the
       // parent index. (It does NOT touch web attr/link/embed data, so it must NOT
-      // invalidate backRefs — that was a spurious over-invalidation.)
+      // invalidate backRefsIndex — that was a spurious over-invalidation.)
       this.invalidateParentIndex();
       for (const node of (this.all({ payload: QUERY_TYPE.NODE }) as Node[] ?? [])) {
         const isZombie: boolean = (node.kind === NODE.KIND.ZOMBIE);
