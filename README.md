@@ -61,6 +61,22 @@ class TreeOnlyCaudex extends Tree(Base) {}
 const tree = new TreeOnlyCaudex(fileData);
 ```
 
+### Partial init (duplicate / invalid items)
+
+By default the constructor throws if **any** item fails to add (e.g. two items share a `uniqKey` value, or a caller-supplied `init.id`). One malformed item aborts the whole batch — hostile to UI consumers. Pass `onInitError: 'collect'` to keep the good items and record the failures instead of throwing:
+
+```ts
+const caudex = new Caudex(fileData, { uniqKeys: ['filename'], onInitError: 'collect' });
+// every valid item is indexed; the rest are on `initErrors`:
+for (const { item, reason } of caudex.initErrors) {
+  // reason: 'uniqkey' (duplicate uniqKey value) | 'id' (init.id collision) | 'invalid'
+  // e.g. drop the duplicate, or re-add an id collision with a fresh id:
+  if (reason === 'id') { caudex.add(item.data); } // mints a new id
+}
+```
+
+`onInitError` defaults to `'throw'` (back-compat). Related: `add()` never overwrites — a `data.id` **or** `init.id` collision warns and returns `undefined`, leaving the existing node untouched.
+
 ### Async
 
 Caudex is synchronously implemented, but asynchronous access can be facilitated by turning on the `thread` option:
@@ -334,15 +350,25 @@ Return an array of node ids for all neighbors / references.
 
 Flush / delete all reference relationships. If no id is given, flush all reference
 
+(Useful for file deletions)
+
 ##### `connect(source: string, target: string, ref: REL.REF, type: string = ''): boolean`
 
 Connect a `source` node id to a `target` node id via the given `ref` kind (`attr` or `link`) and `type` text.
 
+(Useful for file and link creation)
+
 ##### `retype(oldType: string, newType: string[, type: REL.REF]): boolean`
+
+#todo
+
+(Useful for attribute renames)
 
 ##### `transfer(source: string, target: string, kind: REL.REF = REL.REF.REF): Node | undefined`
 
 Transfer the relationships from the `source` node to the `target` node via their IDs. Kind of relationships to transfer can be filtered by the `kind` var. Returns the target node on successful transfer.
+
+(Useful for file renames)
 
 ##### `disconnect(source: string, target: string, ref: REL.REF, type: string = ''): boolean`
 

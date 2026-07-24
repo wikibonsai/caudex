@@ -2,7 +2,9 @@ import { Mutex, withTimeout } from 'async-mutex';
 import { customAlphabet, nanoid } from 'nanoid';
 
 import type {
+  AddErrorReason,
   InitNodeType,
+  InitError,
   BaseNodeData,
   CaudexOpts,
   FilterOpts,
@@ -29,15 +31,8 @@ export class Base {
   public lock: Mutex;                                                    // the actual mutex lock
   // id opts
   public nanoidOpts: any;                                                // nanoid options
-  // back-ref (inverse) index -- a derived cache over the authoritative forward
-  // refs (see web.ts). 'targetId -> Set<sourceId>' per ref kind, rebuilt lazily
-  // from a full scan whenever 'backRefsDirty', invalidated on any mutation.
-  public backRefs: {
-    attr: Map<string, Set<string>>;
-    link: Map<string, Set<string>>;
-    embed: Map<string, Set<string>>;
-  };
-  public backRefsDirty: boolean;
+  // items that failed to add during construction under onInitError: 'collect'
+  public readonly initErrors: InitError[] = [];
 
   constructor(items: BaseNodeData[] | any[], opts?: Partial<CaudexOpts>) {
     // go
@@ -72,13 +67,13 @@ export class Base {
     }
     // init items; populate nodes
     this.index = {};
-    this.backRefs = { attr: new Map(), link: new Map(), embed: new Map() };
-    this.backRefsDirty = true;
     const errorItems: any[] = [];
     for (const item of items) {
-      const newNode: Node | undefined = this.add(item.data, item.init);
-      if (newNode === undefined) {
+      // use tryAdd (not add) so we can capture WHY an item failed to categorize it
+      const { node, reason } = this.tryAdd(item.data, item.init);
+      if (node === undefined) {
         errorItems.push(item);
+        this.initErrors.push({ item, reason: reason ?? 'invalid' });
       }
     }
     // initialize mutex
@@ -90,8 +85,11 @@ export class Base {
       this.useLock = false;
       this.lock = new Mutex(); // setting the mutex is just to make types happy...
     }
-    // finally, print data that was not successfully initialized
-    if (errorItems.length > 0) {
+    // finally, handle data that was not successfully initialized.
+    // default 'throw' preserves back-compat (one bad item aborts the batch);
+    // 'collect' keeps the index and leaves the failures on 'initErrors'.
+    const onInitError: 'throw' | 'collect' = (opts && opts.onInitError) ? opts.onInitError : 'throw';
+    if (errorItems.length > 0 && onInitError === 'throw') {
       throw new Error(`unable to create nodes from items:\n${JSON.stringify(errorItems)}`);
     }
   }
@@ -107,11 +105,11 @@ export class Base {
     return configdNanoid();
   }
 
-  // mark the back-ref index stale; the next back-view query rebuilds it.
-  // called from every method that mutates the node set or forward refs.
-  public invalidateBackRefs(): void {
-    this.backRefsDirty = true;
-  }
+  // Generic "the node set / forward refs changed" hook. Derived-index mixins
+  // (web: backRefs, tree: parentIndex) OVERRIDE this and chain via super() to mark
+  // their caches stale on any base-level mutation. Base can't reference those
+  // indexes directly (it's the innermost mixin), so it just fires this signal.
+  public onMutate(): void {}
 
   public print(printout: boolean = true): string {
     this.checkLock();
@@ -209,7 +207,7 @@ export class Base {
 
   public flushRels(): boolean {
     this.checkLock();
-    this.invalidateBackRefs();
+    this.onMutate();
     for (const node of (this.all({ payload: QUERY_TYPE.NODE }) as Node[] ?? [])) {
       // delete zombies
       if (node.kind === NODE.KIND.ZOMBIE) {
@@ -224,7 +222,7 @@ export class Base {
 
   public clear(): void {
     this.checkLock();
-    this.invalidateBackRefs();
+    this.onMutate();
     this.index = {};
   }
 
@@ -256,12 +254,23 @@ export class Base {
   public add(data: BaseNodeData | any, init?: Partial<InitNodeType>): Node | undefined;  // default-case
   public add(data: string): Node;                                                        // zombie-case
   public add(data: BaseNodeData | any, init?: Partial<InitNodeType>): Node | undefined {
+    // thin wrapper — drops the failure reason; public contract stays Node | undefined.
+    // the constructor calls tryAdd() directly when it needs the reason (initErrors).
+    return this.tryAdd(data, init).node;
+  }
+
+  // add, but returns WHY it failed (node on success; reason on rejection) so the
+  // constructor can categorize collect-mode failures. Public — NOT private —
+  // because caudex is a mixin composition and TS mixins can't carry private/
+  // protected members without collapsing the composed type. Doubles as the
+  // "add-and-tell-me-why" variant for external callers that want the reason.
+  public tryAdd(data: BaseNodeData | any, init?: Partial<InitNodeType>): { node?: Node; reason?: AddErrorReason } {
     this.checkLock();
-    this.invalidateBackRefs();
-    // does id exist?
+    this.onMutate();
+    // does id exist? (data.id channel)
     if (data.id && this.has(data.id)) {
       console.warn(`node with id "${data.id}" already exists`);
-      return undefined;
+      return { reason: 'id' };
     }
     // zombie-case
     if (typeof data === 'string') {
@@ -277,13 +286,19 @@ export class Base {
       if (this.uniqKeyMap) {
         this.uniqKeyMap[this.zombieKey][data] = zombieNode.id;
       }
-      return zombieNode;
+      return { node: zombieNode };
     }
     // default-case
     // is data valid?
     if (!this.validate(data)) {
       // warning will print in 'validateNodeData()' call
-      return undefined;
+      return { reason: 'uniqkey' };
+    }
+    // guard an init.id collision (symmetric with the data.id guard above) --
+    // taking init.id verbatim would silently overwrite the existing node.
+    if (init && init.id && this.has(init.id)) {
+      console.warn(`node with id "${init.id}" already exists`);
+      return { reason: 'id' };
     }
     const id: string      = (init && init.id)   ? init.id   : this.genID();
     const kind: NODE.KIND = (init && init.kind) ? init.kind : NODE.KIND.DOC;
@@ -299,7 +314,7 @@ export class Base {
         this.uniqKeyMap[key][data[key]] = id;
       }
     }
-    return newNode;
+    return { node: newNode };
   }
 
   // edit
@@ -330,7 +345,7 @@ export class Base {
 
   public fill(id: string, data: BaseNodeData | any): Node | undefined {
     this.checkLock();
-    this.invalidateBackRefs();
+    this.onMutate();
     if (!this.has(id) && !(data.id && this.has(data.id))) {
       console.warn(`node with id "${id}" does not exist`);
       return undefined;
@@ -432,7 +447,7 @@ export class Base {
       console.warn(`node with id "${id}" does not exist`);
       return false;
     }
-    this.invalidateBackRefs();
+    this.onMutate();
     const hasRel: boolean = (this.all({ payload: QUERY_TYPE.NODE }) as Node[] ?? []).some((n) =>
       (n.id !== id) && (n.inChildren(id) || n.inAttrs(id) || n.inLinks(id))
     );

@@ -6,6 +6,30 @@ import { Node } from './node';
 export function Web<TBase extends Mixin>(Base: TBase) {
   return class Web extends Base {
 
+    // back-ref (inverse) index — a derived cache over the authoritative forward refs.
+    // 'targetId -> Set<sourceId>' per ref kind, rebuilt lazily from a full scan when
+    // 'backRefsDirty'. Lives in the WEB mixin (only web queries read it — backlinks /
+    // backattrs / backembeds); field-initialized because Web has no constructor.
+    public backRefs: {
+      attr: Map<string, Set<string>>;
+      link: Map<string, Set<string>>;
+      embed: Map<string, Set<string>>;
+    } = { attr: new Map(), link: new Map(), embed: new Map() };
+    public backRefsDirty: boolean = true;
+
+    // mark the back-ref index stale; the next back-view query rebuilds it.
+    public invalidateBackRefs(): void {
+      this.backRefsDirty = true;
+    }
+
+    // any base-level mutation (add / rm / fill / clear / flushRels) can change the
+    // forward refs → stale backRefs. Hook base's onMutate, chaining super so the
+    // tree mixin's parentIndex invalidation still runs.
+    public onMutate(): void {
+      super.onMutate();
+      this.invalidateBackRefs();
+    }
+
     // properties
 
     // nodes that are not linked to any other node in the web

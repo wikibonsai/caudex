@@ -18,6 +18,21 @@ export interface CaudexOpts {
     safe?: boolean;
     timeout?: number; // miliseconds
   }
+  // how the constructor handles items that fail to add (uniqKey / id collision):
+  //   'throw'   (default) -- abort the whole batch (back-compat).
+  //   'collect' -- skip the bad items, index the rest, record failures on
+  //                'initErrors' so a consumer can report/recover them.
+  onInitError?: 'throw' | 'collect';
+}
+
+// why an item failed to add() -- surfaced on Caudex.initErrors so a consumer can
+// tell a uniqKey collision (drop the duplicate) from an id collision (re-add with
+// a fresh id) apart.
+export type AddErrorReason = 'id' | 'uniqkey' | 'invalid';
+
+export interface InitError {
+  item: any;
+  reason: AddErrorReason;
 }
 
 export interface BaseNodeData {

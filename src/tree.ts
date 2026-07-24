@@ -7,6 +7,40 @@ export function Tree<TBase extends Mixin>(Base: TBase) {
   return class Tree extends Base {
     public _root: string | undefined;
 
+    // parent index — 'childId -> parentId', a derived cache over the tree's child
+    // pointers so parent()/ancestors()/inTree() are O(1)/O(depth) instead of a full
+    // tree walk per call (the graph-lineage + ancestor derives that the app's
+    // caudexRevision storm hammers). Mirrors web's backRefs: lazy, rebuilt when
+    // dirty, invalidated on any mutation. Field-initialized (Tree has no constructor).
+    public parentIndex: Map<string, string> = new Map();
+    public parentIndexDirty: boolean = true;
+
+    public invalidateParentIndex(): void {
+      this.parentIndexDirty = true;
+    }
+
+    // rebuild from a single scan: every node's children point back to it.
+    public rebuildParentIndex(): void {
+      const idx: Map<string, string> = new Map();
+      for (const node of Object.values(this.index)) {
+        for (const childID of node.children) { idx.set(childID, node.id); }
+      }
+      this.parentIndex = idx;
+      this.parentIndexDirty = false;
+    }
+
+    public ensureParentIndex(): void {
+      if (this.parentIndexDirty) { this.rebuildParentIndex(); }
+    }
+
+    // tree relations change on graft/prune/setRoot/replace AND on base-level node
+    // add/rm/clear (a removed parent strands its children), so hook base's onMutate;
+    // chain super so web's backRefs invalidation still runs.
+    public onMutate(): void {
+      super.onMutate();
+      this.invalidateParentIndex();
+    }
+
     // root operations
 
     // note: typescript does not allow for separate types between get/set
@@ -43,6 +77,7 @@ export function Tree<TBase extends Mixin>(Base: TBase) {
       return this.get(this._root, opts !== undefined ? opts : { payload: QUERY_TYPE.ID });
     }
 
+    // #todo -- rm 'treeIDs' ...?
     orphans(treeIDs: string[], opts?: QueryOpts): string[] | Node[] | any[] | undefined {
       this.checkLock();
       const payload = opts?.payload ?? QUERY_TYPE.ID;
@@ -62,7 +97,17 @@ export function Tree<TBase extends Mixin>(Base: TBase) {
     ancestors(id: string, opts?: QueryOpts): string[] | Node[] | any[] | undefined {
       this.checkLock();
       if (!this.has(id)) { return undefined; }
-      const ids: string[] = this.getRelFam(id, REL.FAM.ANCESTORS);
+      // walk up the parent index (top-down order: [root, …, parent]) instead of a
+      // full-tree search() per call.
+      this.ensureParentIndex();
+      const ids: string[] = [];
+      const seen: Set<string> = new Set();   // defensive cycle guard
+      let cur: string | undefined = this.parentIndex.get(id);
+      while (cur !== undefined && !seen.has(cur)) {
+        ids.unshift(cur);
+        seen.add(cur);
+        cur = this.parentIndex.get(cur);
+      }
       const payload = opts?.payload ?? QUERY_TYPE.ID;
       return (payload === QUERY_TYPE.ID || payload === undefined) ? ids : ids.map((nodeId) => this.get(nodeId, { ...opts, payload }));
     }
@@ -70,10 +115,12 @@ export function Tree<TBase extends Mixin>(Base: TBase) {
     parent(id: string, opts?: QueryOpts): string | Node | any | undefined {
       this.checkLock();
       if (!this.has(id)) { return undefined; }
-      const ids = this.getRelFam(id, REL.FAM.PARENT);
-      if (ids.length === 0) { return ''; }
+      // O(1) lookup via the parent index (was: getRelFam → full-tree search()).
+      this.ensureParentIndex();
+      const parentID: string | undefined = this.parentIndex.get(id);
+      if (parentID === undefined) { return ''; }
       const payload = opts?.payload ?? QUERY_TYPE.ID;
-      return (payload === QUERY_TYPE.ID || payload === undefined) ? ids[0] : this.get(ids[0], { ...opts, payload });
+      return (payload === QUERY_TYPE.ID || payload === undefined) ? parentID : this.get(parentID, { ...opts, payload });
     }
 
     siblings(id: string, opts?: QueryOpts): string[] | Node[] | any[] | undefined {
@@ -219,7 +266,10 @@ export function Tree<TBase extends Mixin>(Base: TBase) {
 
     public flushRelFams(): boolean {
       this.checkLock();
-      this.invalidateBackRefs();
+      // flushing tree relations strands every child→parent edge → invalidate the
+      // parent index. (It does NOT touch web attr/link/embed data, so it must NOT
+      // invalidate backRefs — that was a spurious over-invalidation.)
+      this.invalidateParentIndex();
       for (const node of (this.all({ payload: QUERY_TYPE.NODE }) as Node[] ?? [])) {
         const isZombie: boolean = (node.kind === NODE.KIND.ZOMBIE);
         /* eslint-disable indent */
@@ -267,6 +317,7 @@ export function Tree<TBase extends Mixin>(Base: TBase) {
         return false;
       }
       this.get(parentID, { payload: QUERY_TYPE.NODE }).children.push(childID);
+      this.invalidateParentIndex();
       if (!force && !this.isTree()) {
         this.get(parentID, { payload: QUERY_TYPE.NODE }).children.pop();
         return false;
@@ -314,6 +365,7 @@ export function Tree<TBase extends Mixin>(Base: TBase) {
       // children
       targetNode.children = sourceNode.children;
       sourceNode.children = [];
+      this.invalidateParentIndex();
       return true;
     }
 
@@ -417,8 +469,9 @@ export function Tree<TBase extends Mixin>(Base: TBase) {
       // If the resulting structure is not a valid tree, revert the change
       if (!force && !this.isTree()) {
         parentNode.children.push(childID);
-        return false;
+        return false;   // reverted → no net child change, index still valid
       }
+      this.invalidateParentIndex();
       return true;
     }
 
@@ -426,10 +479,10 @@ export function Tree<TBase extends Mixin>(Base: TBase) {
 
     public inTree(id: string): boolean {
       this.checkLock();
-      /* eslint-disable indent */
-      return ((this.all({ payload: QUERY_TYPE.NODE }) as Node[] ?? [])
-                  .find(node => node.children.includes(id)) !== undefined);
-      /* eslint-enable indent */
+      // "in the tree" == has a parent (matches the old full-scan for a node whose
+      // children include id; the root has no parent and was false there too). O(1).
+      this.ensureParentIndex();
+      return this.parentIndex.has(id);
     }
 
     public isRoot(id: string): boolean {
