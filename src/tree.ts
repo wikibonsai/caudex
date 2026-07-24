@@ -1,5 +1,5 @@
 import type { Mixin, QueryOpts } from './types';
-import { DATA_STRUCT, NODE, QUERY_TYPE, REL } from './const';
+import { DATA_STRUCT, NODE, QUERY_TYPE } from './const';
 import { Node } from './node';
 
 
@@ -97,17 +97,8 @@ export function Tree<TBase extends Mixin>(Base: TBase) {
     ancestors(id: string, opts?: QueryOpts): string[] | Node[] | any[] | undefined {
       this.checkLock();
       if (!this.has(id)) { return undefined; }
-      // walk up the parent index (top-down order: [root, …, parent]) instead of a
-      // full-tree search() per call.
-      this.ensureParentIndex();
-      const ids: string[] = [];
-      const seen: Set<string> = new Set();   // defensive cycle guard
-      let cur: string | undefined = this.parentIndex.get(id);
-      while (cur !== undefined && !seen.has(cur)) {
-        ids.unshift(cur);
-        seen.add(cur);
-        cur = this.parentIndex.get(cur);
-      }
+      // a direct vertical walk up the ancestry path (was: full-tree search()).
+      const ids: string[] = this.walkUp(id);
       const payload = opts?.payload ?? QUERY_TYPE.ID;
       return (payload === QUERY_TYPE.ID || payload === undefined) ? ids : ids.map((nodeId) => this.get(nodeId, { ...opts, payload }));
     }
@@ -126,7 +117,13 @@ export function Tree<TBase extends Mixin>(Base: TBase) {
     siblings(id: string, opts?: QueryOpts): string[] | Node[] | any[] | undefined {
       this.checkLock();
       if (!this.has(id)) { return undefined; }
-      const ids = this.getRelFam(id, REL.FAM.SIBLINGS);
+      // the parent's other children (parent via the index; [] if id is the root).
+      this.ensureParentIndex();
+      const parentID: string | undefined = this.parentIndex.get(id);
+      const parentNode: Node | undefined = parentID !== undefined
+        ? this.get(parentID, { payload: QUERY_TYPE.NODE })
+        : undefined;
+      const ids: string[] = parentNode ? parentNode.children.filter((child: string) => child !== id) : [];
       const payload = opts?.payload ?? QUERY_TYPE.ID;
       return (payload === QUERY_TYPE.ID || payload === undefined) ? ids : ids.map((nodeId) => this.get(nodeId, { ...opts, payload }));
     }
@@ -134,7 +131,10 @@ export function Tree<TBase extends Mixin>(Base: TBase) {
     children(id: string, opts?: QueryOpts): string[] | Node[] | any[] | undefined {
       this.checkLock();
       if (!this.has(id)) { return undefined; }
-      const ids = this.getRelFam(id, REL.FAM.CHILDREN);
+      // the node's direct child pointers — already stored on the node (no walk).
+      // root-anchored: a detached node reads empty (see isRooted()).
+      const node: Node | undefined = this.get(id, { payload: QUERY_TYPE.NODE });
+      const ids: string[] = (node && this.isRooted(id)) ? [...node.children] : [];
       const payload = opts?.payload ?? QUERY_TYPE.ID;
       return (payload === QUERY_TYPE.ID || payload === undefined) ? ids : ids.map((nodeId) => this.get(nodeId, { ...opts, payload }));
     }
@@ -142,7 +142,9 @@ export function Tree<TBase extends Mixin>(Base: TBase) {
     descendants(id: string, opts?: QueryOpts): string[] | Node[] | any[] | undefined {
       this.checkLock();
       if (!this.has(id)) { return undefined; }
-      const ids = this.getRelFam(id, REL.FAM.DESCENDANTS);
+      // a direct vertical walk down the child pointers (was: full-tree search()).
+      // root-anchored: a detached node reads empty (see isRooted()).
+      const ids: string[] = this.isRooted(id) ? this.walkDown(id) : [];
       const payload = opts?.payload ?? QUERY_TYPE.ID;
       return (payload === QUERY_TYPE.ID || payload === undefined) ? ids : ids.map((nodeId) => this.get(nodeId, { ...opts, payload }));
     }
@@ -150,7 +152,10 @@ export function Tree<TBase extends Mixin>(Base: TBase) {
     lineage(id: string, opts?: QueryOpts): string[] | Node[] | any[] | undefined {
       this.checkLock();
       if (!this.has(id)) { return undefined; }
-      const ids = this.getRelFam(id, REL.FAM.LINEAGE);
+      // the full vertical line through id: ancestors (up) then descendants (down),
+      // excluding id itself — one walkUp + one walkDown, no from-root tree search.
+      // root-anchored: a detached node reads empty (see isRooted()).
+      const ids: string[] = this.isRooted(id) ? [...this.walkUp(id), ...this.walkDown(id)] : [];
       const payload = opts?.payload ?? QUERY_TYPE.ID;
       return (payload === QUERY_TYPE.ID || payload === undefined) ? ids : ids.map((nodeId) => this.get(nodeId, { ...opts, payload }));
     }
@@ -165,102 +170,117 @@ export function Tree<TBase extends Mixin>(Base: TBase) {
 
     // util
 
-    public getRelFam(id: string, relFam: REL.FAM): string[] {
+    // the two directional primitives every vertical family query composes from.
+    // They replaced a single monolithic search() that crawled the whole tree from
+    // the root — building throwaway relation-paths down every branch — just to locate
+    // `id` and read off its relations. Now each query walks straight up or down from
+    // `id` itself: O(depth) / O(subtree), never O(tree).
+
+    // walk UP the parent index from `id` to the root. Returns the ancestry path in
+    // top-down order [root, …, parent] (excludes `id`). Backs parent()/ancestors()/
+    // lineage(). O(depth).
+    public walkUp(id: string): string[] {
       this.checkLock();
-      // if uri does not exist in index
-      if (!this.has(id)) { return []; }
-      // prep data collection
-      const initRelFamData: Record<REL.FAM, string[]> = {} as Record<REL.FAM, string[]>;
-      initRelFamData[relFam] = [];
-      // get target family uris
-      const famIDs: Record<REL.FAM, string[]> | undefined = this.search(id, initRelFamData);
-      return (famIDs === undefined) ? [] : famIDs[relFam];
+      this.ensureParentIndex();
+      const ids: string[] = [];
+      const seen: Set<string> = new Set();   // defensive cycle guard
+      let cur: string | undefined = this.parentIndex.get(id);
+      while (cur !== undefined && !seen.has(cur)) {
+        ids.unshift(cur);
+        seen.add(cur);
+        cur = this.parentIndex.get(cur);
+      }
+      return ids;
     }
 
-    // todo
-    // public getFamRels(id: string, relFams: REL.FAM[]): Record<REL.FAM, string[]> {
-    //   // if uri does not exist in index
-    //   if (!this.has(id)) { return {} as Record<REL.FAM, string[]>; }
-    //   // prep data collection
-    //   const initFamRelsData: Record<REL.FAM, string[]> = {} as Record<REL.FAM, string[]>;
-    //   for (const famRel of relFams) {
-    //     initFamRelsData[famRel] = [];
+    // walk DOWN the child pointers from `id`. Returns every descendant (excludes `id`)
+    // in the order the old search() produced: a node's direct children before their
+    // subtrees. Backs descendants()/lineage(). O(subtree).
+    public walkDown(id: string): string[] {
+      const node: Node | undefined = this.get(id, { payload: QUERY_TYPE.NODE });
+      if (node === undefined) { return []; }
+      const ids: string[] = [...node.children];
+      for (const childID of node.children) {
+        ids.push(...this.walkDown(childID));
+      }
+      return ids;
+    }
+
+    // retired: the monolithic from-root tree search that getRelFam() used to back
+    // parent/ancestors/siblings/children/descendants/lineage. Superseded by the
+    // walkUp/walkDown primitives + parentIndex above (each query is now a direct
+    // vertical walk from the node, O(depth)/O(subtree) instead of O(tree)). Kept
+    // commented as a reference for the original relation-collection semantics.
+    //
+    // public search(
+    //   nodeID:string,
+    //   relData: Record<REL.FAM, string[]>,
+    //   node: Node | undefined = {} as Node,
+    //   depth: number = 0,
+    //   found: boolean = false,
+    // ): Record<REL.FAM, string[]> | undefined {
+    //   this.checkLock();
+    //   // handle root + init result info
+    //   if (depth === 0) {
+    //     node = this.root({ payload: QUERY_TYPE.NODE });
+    //     if (node === undefined) { Error('root undefined'); return undefined; }
     //   }
-    //   // get target family uris
-    //   const relFamsData: Record<REL.FAM, string[]> | undefined = this.search(id, initFamRelsData);
-    //   return (relFamsData === undefined) ? {} as Record<REL.FAM, string[]> : relFamsData;
+    //   const atTargetNode: boolean = (nodeID === node.id);
+    //   if (atTargetNode || found) {
+    //     // at target node
+    //     if (atTargetNode) {
+    //       if (REL.FAM.CHILDREN in relData) {
+    //         relData['children'] = node.children;
+    //       }
+    //     }
+    //     // already found -- continue building 'descendants' / 'lineage'
+    //     if (REL.FAM.DESCENDANTS in relData) {
+    //       relData['descendants'] = relData['descendants'].concat(node.children);
+    //     }
+    //     if (REL.FAM.LINEAGE in relData) {
+    //       relData['lineage'] = relData['lineage'].concat(node.children);
+    //     }
+    //     if ((REL.FAM.DESCENDANTS in relData) || (REL.FAM.LINEAGE in relData)) {
+    //       for (const child of node.children) {
+    //         const nextNode: Node | undefined = this.get(child, { payload: QUERY_TYPE.NODE });
+    //         if (nextNode === undefined) { return undefined; }
+    //         this.search(nodeID, relData, nextNode, depth + 1, true);
+    //       }
+    //     }
+    //     return relData;
+    //   // still searching or building
+    //   } else {
+    //     if (REL.FAM.ANCESTORS in relData) {
+    //       relData['ancestors'].push(node.id);
+    //     }
+    //     if (REL.FAM.LINEAGE in relData) {
+    //       relData['lineage'].push(node.id);
+    //     }
+    //     // if current node is the target's parent
+    //     const targetNodeID: string | undefined = node.children.find((child: string) => child === nodeID);
+    //     if (targetNodeID !== undefined) {
+    //       const targetNode = this.get(targetNodeID, { payload: QUERY_TYPE.NODE });
+    //       if (targetNode === undefined) { return undefined; }
+    //       if (REL.FAM.PARENT in relData) {
+    //         relData['parent'] = [node.id];
+    //       }
+    //       if (REL.FAM.SIBLINGS in relData) {
+    //         relData['siblings'] = node.children.filter((child: string) => child !== nodeID);
+    //       }
+    //       const result = this.search(nodeID,  relData, targetNode, depth + 1);
+    //       if (result !== undefined) { return result; }
+    //     // keep searching
+    //     } else {
+    //       for (const child of node.children) {
+    //         const nextNode: Node | undefined = this.get(child, { payload: QUERY_TYPE.NODE });
+    //         if (nextNode === undefined) { return undefined; }
+    //         // there should only be one unique path, so return only that one result
+    //         const result = this.search(nodeID, JSON.parse(JSON.stringify(relData)), nextNode, depth + 1);
+    //         if (result !== undefined) { return result; }
+    //       }
+    //     }
+    //   }
     // }
-
-    // usage note: use getter wrappers plz
-    public search(
-      nodeID:string,
-      relData: Record<REL.FAM, string[]>,
-      node: Node | undefined = {} as Node,
-      depth: number = 0,
-      found: boolean = false,
-    ): Record<REL.FAM, string[]> | undefined {
-      this.checkLock();
-      // handle root + init result info
-      if (depth === 0) {
-        node = this.root({ payload: QUERY_TYPE.NODE });
-        if (node === undefined) { Error('root undefined'); return undefined; }
-      }
-      const atTargetNode: boolean = (nodeID === node.id);
-      if (atTargetNode || found) {
-        // at target node
-        if (atTargetNode) {
-          if (REL.FAM.CHILDREN in relData) {
-            relData['children'] = node.children;
-          }
-        }
-        // already found -- continue building 'descendants' / 'lineage'
-        if (REL.FAM.DESCENDANTS in relData) {
-          relData['descendants'] = relData['descendants'].concat(node.children);
-        }
-        if (REL.FAM.LINEAGE in relData) {
-          relData['lineage'] = relData['lineage'].concat(node.children);
-        }
-        if ((REL.FAM.DESCENDANTS in relData) || (REL.FAM.LINEAGE in relData)) {
-          for (const child of node.children) {
-            const nextNode: Node | undefined = this.get(child, { payload: QUERY_TYPE.NODE });
-            if (nextNode === undefined) { return undefined; }
-            this.search(nodeID, relData, nextNode, depth + 1, true);
-          }
-        }
-        return relData;
-      // still searching or building
-      } else {
-        if (REL.FAM.ANCESTORS in relData) {
-          relData['ancestors'].push(node.id);
-        }
-        if (REL.FAM.LINEAGE in relData) {
-          relData['lineage'].push(node.id);
-        }
-        // if current node is the target's parent
-        const targetNodeID: string | undefined = node.children.find((child: string) => child === nodeID);
-        if (targetNodeID !== undefined) {
-          const targetNode = this.get(targetNodeID, { payload: QUERY_TYPE.NODE });
-          if (targetNode === undefined) { return undefined; }
-          if (REL.FAM.PARENT in relData) {
-            relData['parent'] = [node.id];
-          }
-          if (REL.FAM.SIBLINGS in relData) {
-            relData['siblings'] = node.children.filter((child: string) => child !== nodeID);
-          }
-          const result = this.search(nodeID,  relData, targetNode, depth + 1);
-          if (result !== undefined) { return result; }
-        // keep searching
-        } else {
-          for (const child of node.children) {
-            const nextNode: Node | undefined = this.get(child, { payload: QUERY_TYPE.NODE });
-            if (nextNode === undefined) { return undefined; }
-            // there should only be one unique path, so return only that one result
-            const result = this.search(nodeID, JSON.parse(JSON.stringify(relData)), nextNode, depth + 1);
-            if (result !== undefined) { return result; }
-          }
-        }
-      }
-    }
 
     // methods
 
@@ -520,6 +540,24 @@ export function Tree<TBase extends Mixin>(Base: TBase) {
         }
       }
       return true;
+    }
+
+    // whether `id` is currently connected to the root. The relational family queries
+    // are root-anchored (as the old search() was, crawling from the root): a node
+    // detached from the root — e.g. a force-pruned subtree — keeps its raw child
+    // pointers on the node (get().children) but reads empty through children()/
+    // descendants()/lineage() until it is re-grafted. O(depth), short-circuits at root.
+    public isRooted(id: string): boolean {
+      this.ensureParentIndex();
+      if (id === this._root) { return true; }
+      const seen: Set<string> = new Set();   // defensive cycle guard
+      let cur: string | undefined = this.parentIndex.get(id);
+      while (cur !== undefined && !seen.has(cur)) {
+        if (cur === this._root) { return true; }
+        seen.add(cur);
+        cur = this.parentIndex.get(cur);
+      }
+      return false;
     }
 
     // 'key' -- the data key to print
