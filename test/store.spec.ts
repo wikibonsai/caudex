@@ -1,6 +1,6 @@
 import assert from 'node:assert';
 
-import type { StoragePort } from '../src/store';
+import type { ChangeEvent, StoragePort } from '../src/store';
 import { DerivedIndex, NodeStore } from '../src/store';
 import { Node, NODE } from '../src/index';
 
@@ -188,6 +188,26 @@ describe('store (StoragePort)', () => {
       store.invalidateIndexes();
       assert.strictEqual(one.dirty, true);
       assert.strictEqual(two.dirty, true);
+    });
+
+    it('defineIndex with scopes; signal() invalidates only matching indexes and notifies listeners', () => {
+      const treeIdx: DerivedIndex<number> = store.defineIndex('tree-scoped', countProjector, { scopes: ['node', 'tree'] });
+      const webIdx: DerivedIndex<number> = store.defineIndex('web-scoped', countProjector, { scopes: ['node', 'web'] });
+      treeIdx.ensure(store);
+      webIdx.ensure(store);
+      const events: ChangeEvent[] = [];
+      store.onChange((e: ChangeEvent) => events.push(e));
+      store.signal({ kind: 'tree', op: 'graft' });
+      assert.strictEqual(treeIdx.dirty, true);
+      assert.strictEqual(webIdx.dirty, false);
+      assert.deepEqual(events, [{ kind: 'tree', op: 'graft' }]);
+    });
+
+    it('defineIndex default scopes; every kind invalidates', () => {
+      const idx: DerivedIndex<number> = store.defineIndex('all-scoped', countProjector);
+      idx.ensure(store);
+      store.signal({ kind: 'web', op: 'connect' });
+      assert.strictEqual(idx.dirty, true);
     });
 
   });

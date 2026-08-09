@@ -25,6 +25,7 @@ export function Tree<TBase extends Mixin>(Base: TBase) {
         }
         return idx;
       },
+      { scopes: ['node', 'tree'] },
     );
 
     public get parentIndexDirty(): boolean {
@@ -80,14 +81,16 @@ export function Tree<TBase extends Mixin>(Base: TBase) {
       return this.get(this._root, opts !== undefined ? opts : { payload: QUERY_TYPE.ID });
     }
 
-    // #todo -- rm 'treeIDs' ...?
-    orphans(treeIDs: string[], opts?: QueryOpts): string[] | Node[] | any[] | undefined {
+    // 'treeIDs' optionally restricts the candidate set; the attachment test itself
+    // is pure index state (setRoot/graft own the tree), so the default is simply
+    // "every node".
+    orphans(treeIDs?: string[], opts?: QueryOpts): string[] | Node[] | any[] | undefined {
       this.checkLock();
       const payload = opts?.payload ?? QUERY_TYPE.ID;
       /* eslint-disable indent */
       return (this.all({ ...opts, payload: QUERY_TYPE.NODE }) as Node[] ?? [])
                  .filter((node: Node) =>
-                    treeIDs.includes(node.id)
+                    ((treeIDs === undefined) || treeIDs.includes(node.id))
                     && (node.children.length === 0)
                     && !this.parent(node.id)
                     && (node.kind !== NODE.KIND.ZOMBIE)
@@ -287,10 +290,10 @@ export function Tree<TBase extends Mixin>(Base: TBase) {
 
     public flushRelFams(): boolean {
       this.checkLock();
-      // flushing tree relations strands every child→parent edge → invalidate the
-      // parent index. (It does NOT touch web attr/link/embed data, so it must NOT
-      // invalidate backRefsIndex — that was a spurious over-invalidation.)
-      this.invalidateParentIndex();
+      // flushing tree relations strands every child→parent edge → signal a
+      // tree-kind change. (It does NOT touch web attr/link/embed data, so it must
+      // NOT stale backRefsIndex — tree-kind leaves web-scoped indexes alone.)
+      this.store.signal({ kind: 'tree', op: 'flushRelFams' });
       for (const node of (this.all({ payload: QUERY_TYPE.NODE }) as Node[] ?? [])) {
         const isZombie: boolean = (node.kind === NODE.KIND.ZOMBIE);
         /* eslint-disable indent */
@@ -338,7 +341,7 @@ export function Tree<TBase extends Mixin>(Base: TBase) {
         return false;
       }
       this.get(parentID, { payload: QUERY_TYPE.NODE }).children.push(childID);
-      this.invalidateParentIndex();
+      this.store.signal({ kind: 'tree', op: 'graft', id: childID });
       if (!force && !this.isTree()) {
         this.get(parentID, { payload: QUERY_TYPE.NODE }).children.pop();
         return false;
@@ -386,7 +389,7 @@ export function Tree<TBase extends Mixin>(Base: TBase) {
       // children
       targetNode.children = sourceNode.children;
       sourceNode.children = [];
-      this.invalidateParentIndex();
+      this.store.signal({ kind: 'tree', op: 'replace', id: targetID });
       return true;
     }
 
@@ -411,6 +414,10 @@ export function Tree<TBase extends Mixin>(Base: TBase) {
       const newSubtreeMap: Map<string, string[]> = new Map(subtree.map(node => [node.id, node.children]));
       // perform changes
       this.doTransplant(subrootID, newSubtreeMap, rollbackState);
+      // signal covers the rollback path too (conservative: children were mutated
+      // and restored). NOTE: pre-refactor, transplant never invalidated the parent
+      // index at all -- a warm parent() answered stale after a transplant.
+      this.store.signal({ kind: 'tree', op: 'transplant', id: subrootID });
       // rollback if invalid tree or some other error
       if (!this.isTree()) {
         console.warn('transplant failed due to invalid resultant tree -- rolling back to previous state');
@@ -492,7 +499,7 @@ export function Tree<TBase extends Mixin>(Base: TBase) {
         parentNode.children.push(childID);
         return false;   // reverted → no net child change, index still valid
       }
-      this.invalidateParentIndex();
+      this.store.signal({ kind: 'tree', op: 'prune', id: childID });
       return true;
     }
 

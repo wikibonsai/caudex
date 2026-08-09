@@ -172,6 +172,14 @@ describe('tree', () => {
         assert.deepEqual(bonsai.orphans(bonsai.all()), []);
       });
 
+      it('treeIDs optional; defaults to the whole index', () => {
+        assert.deepEqual(bonsai.orphans(), ['5']);
+      });
+
+      it('treeIDs optional; with query opts', () => {
+        assert.deepEqual(bonsai.orphans(undefined, { payload: QUERY_TYPE.NODEKIND }), [NODE.KIND.DOC]);
+      });
+
       it('with query', () => {
         assert.deepEqual(bonsai.orphans(bonsai.all(), { payload: QUERY_TYPE.NODE }), [{
           id: '5',
@@ -924,6 +932,25 @@ describe('tree', () => {
           assert.deepStrictEqual(bonsai.get('2').children, []);
           assert.deepStrictEqual(bonsai.get('3').children, []);
           assert.deepStrictEqual(bonsai.get('4').children, []);
+        });
+
+        it('invalidates the parent index (a warm parent() answers fresh after transplant)', () => {
+          /*
+           *    2          2
+           *   / \  -->    |
+           *  3   4        4
+           *               |
+           *               3
+           */
+          // warm the parent index before transplanting
+          assert.strictEqual(bonsai.parent('3'), '2');
+          const subtree: any = [
+            { id: '2', children: ['4'] },
+            { id: '4', children: ['3'] },
+            { id: '3', children: [] },
+          ];
+          assert.strictEqual(bonsai.transplant('2', subtree), true);
+          assert.strictEqual(bonsai.parent('3'), '4');
         });
 
         it('invalid; subroot not included in subtree', () => {

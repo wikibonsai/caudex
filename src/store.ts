@@ -1,6 +1,28 @@
 import { Node } from './node';
 
 
+// typed change events -- the semantic layer signals WHAT changed; the store
+// routes the signal to (a) scoped derived-index invalidation and (b) external
+// subscribers. Kinds mirror the consumer's revision axes:
+//   'node' -- the node set changed (add/rm/fill/flushRels/clear); all indexes stale.
+//   'tree' -- the hierarchy changed (graft/prune/replace/transplant/flushRelFams).
+//   'web'  -- the relations changed (connect/disconnect/retype/transfer/flushRelRefs).
+// Content-only ops (edit/flushData) do NOT signal -- they invalidate nothing
+// today, and emitting on them would over-invalidate scoped indexes.
+export type ChangeKind = 'node' | 'tree' | 'web';
+
+export interface ChangeEvent {
+  kind: ChangeKind;
+  op: string;
+  id?: string;
+}
+
+export type ChangeListener = (event: ChangeEvent) => void;
+
+export interface DefineIndexOpts {
+  scopes?: ChangeKind[];   // which change kinds stale this index; default: all
+}
+
 // the StoragePort contract -- what Refactor #2 adapters (sqlite / graphology / etc.)
 // must implement to slot in under the semantic core.
 export interface StoragePort {
@@ -17,8 +39,10 @@ export interface StoragePort {
   indexKey(key: string, value: any, id: string): void;
   deindexKey(key: string, value: any): void;
   serialize(): string;
-  defineIndex<T>(name: string, projector: (store: StoragePort) => T): DerivedIndex<T>;
+  defineIndex<T>(name: string, projector: (store: StoragePort) => T, opts?: DefineIndexOpts): DerivedIndex<T>;
   invalidateIndexes(): void;
+  signal(event: ChangeEvent): void;
+  onChange(listener: ChangeListener): () => void;
 }
 
 // a lazily-(re)built cache derived from the node store. Each instance supplies
@@ -29,12 +53,14 @@ export interface StoragePort {
 // sweeps every index without each one hooking the mutation path itself.
 export class DerivedIndex<T> {
   public readonly name: string;
+  public readonly scopes: Set<ChangeKind>;
   #projector: (store: StoragePort) => T;
   #value: T | undefined;
   #dirty: boolean = true;
 
-  constructor(name: string, projector: (store: StoragePort) => T) {
+  constructor(name: string, projector: (store: StoragePort) => T, scopes?: ChangeKind[]) {
     this.name = name;
+    this.scopes = new Set(scopes ?? ['node', 'tree', 'web']);
     this.#projector = projector;
   }
 
@@ -82,6 +108,7 @@ export class NodeStore implements StoragePort {
   #nodes: Record<string, Node> = {};
   #uniqKeyMap: Record<string, Record<string, string>> | undefined;
   #indexes: DerivedIndex<any>[] = [];
+  #listeners: ChangeListener[] = [];
   public readonly uniqKeys: string[];
 
   constructor(uniqKeys?: string[]) {
@@ -155,20 +182,44 @@ export class NodeStore implements StoragePort {
 
   // derived indexes
 
-  public defineIndex<T>(name: string, projector: (store: StoragePort) => T): DerivedIndex<T> {
-    const index: DerivedIndex<T> = new DerivedIndex<T>(name, projector);
+  public defineIndex<T>(name: string, projector: (store: StoragePort) => T, opts?: DefineIndexOpts): DerivedIndex<T> {
+    const index: DerivedIndex<T> = new DerivedIndex<T>(name, projector, opts?.scopes);
     this.#indexes.push(index);
     return index;
   }
 
-  // the store-level mutation signal: mark every registered index stale. Fired
-  // from the semantic layer (base.onMutate) rather than from the crud primitives
-  // above, because many mutations happen directly on node objects (connect,
-  // graft, node.flush, ...) and never pass through the store's crud at all.
+  // unconditional sweep: mark every registered index stale (scope-blind).
   public invalidateIndexes(): void {
     for (const index of this.#indexes) {
       index.invalidate();
     }
+  }
+
+  // change events
+
+  // the typed mutation signal: stale the derived indexes scoped to this change
+  // kind, then notify subscribers. Fired from the semantic layer (base/tree/web
+  // mutation sites) rather than from the crud primitives above, because many
+  // mutations happen directly on node objects (connect, graft, node.flush, ...)
+  // and never pass through the store's crud at all.
+  public signal(event: ChangeEvent): void {
+    for (const index of this.#indexes) {
+      if (index.scopes.has(event.kind)) {
+        index.invalidate();
+      }
+    }
+    for (const listener of [...this.#listeners]) {
+      listener(event);
+    }
+  }
+
+  // subscribe to change events; returns the unsubscribe.
+  public onChange(listener: ChangeListener): () => void {
+    this.#listeners.push(listener);
+    return (): void => {
+      const at: number = this.#listeners.indexOf(listener);
+      if (at !== -1) { this.#listeners.splice(at, 1); }
+    };
   }
 
   // (de)serialization -- the refactor #2 persistence hook

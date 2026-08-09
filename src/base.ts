@@ -115,10 +115,11 @@ export class Base {
   }
 
   // Generic "the node set changed" hook, fired on every base-level mutation.
-  // Sweeps all derived indexes registered against the store (tree: parentIndex,
-  // web: backRefsIndex) -- replacing the old per-mixin override + super() chain.
-  public onMutate(): void {
-    this.store.invalidateIndexes();
+  // Signals a node-kind change event through the store: stales all node-scoped
+  // derived indexes (tree: parentIndex, web: backRefsIndex -- replacing the old
+  // per-mixin override + super() chain) and reaches change subscribers.
+  public onMutate(op: string = 'mutate', id?: string): void {
+    this.store.signal({ kind: 'node', op, ...(id !== undefined && { id }) });
   }
 
   public print(printout: boolean = true): string {
@@ -218,7 +219,7 @@ export class Base {
 
   public flushRels(): boolean {
     this.checkLock();
-    this.onMutate();
+    this.onMutate('flushRels');
     for (const node of (this.all({ payload: QUERY_TYPE.NODE }) as Node[] ?? [])) {
       // delete zombies
       if (node.kind === NODE.KIND.ZOMBIE) {
@@ -233,7 +234,7 @@ export class Base {
 
   public clear(): void {
     this.checkLock();
-    this.onMutate();
+    this.onMutate('clear');
     this.store.clear();
   }
 
@@ -277,7 +278,7 @@ export class Base {
   // "add-and-tell-me-why" variant for external callers that want the reason.
   public tryAdd(data: BaseNodeData | any, init?: Partial<InitNodeType>): { node?: Node; reason?: AddErrorReason } {
     this.checkLock();
-    this.onMutate();
+    this.onMutate('add');
     // does id exist? (data.id channel)
     if (data.id && this.has(data.id)) {
       console.warn(`node with id "${data.id}" already exists`);
@@ -354,7 +355,7 @@ export class Base {
 
   public fill(id: string, data: BaseNodeData | any): Node | undefined {
     this.checkLock();
-    this.onMutate();
+    this.onMutate('fill', id);
     if (!this.has(id) && !(data.id && this.has(data.id))) {
       console.warn(`node with id "${id}" does not exist`);
       return undefined;
@@ -459,7 +460,7 @@ export class Base {
       console.warn(`node with id "${id}" does not exist`);
       return false;
     }
-    this.onMutate();
+    this.onMutate('rm', id);
     const hasRel: boolean = (this.all({ payload: QUERY_TYPE.NODE }) as Node[] ?? []).some((n) =>
       (n.id !== id) && (n.inChildren(id) || n.inAttrs(id) || n.inLinks(id))
     );

@@ -38,6 +38,7 @@ export function Web<TBase extends Mixin>(Base: TBase) {
         }
         return { attr, link, embed };
       },
+      { scopes: ['node', 'web'] },
     );
 
     public get backRefsIndexDirty(): boolean {
@@ -311,7 +312,7 @@ export function Web<TBase extends Mixin>(Base: TBase) {
 
     public flushRelRefs(id?: string): boolean {
       this.checkLock();
-      this.invalidateBackRefsIndex();
+      this.store.signal({ kind: 'web', op: 'flushRelRefs', ...(id !== undefined && { id }) });
       // single
       if (id) {
         const node: Node | undefined = this.get(id);
@@ -376,7 +377,7 @@ export function Web<TBase extends Mixin>(Base: TBase) {
         throw new Error('attrs do not support headers');
       }
       this.checkLock();
-      this.invalidateBackRefsIndex();
+      this.store.signal({ kind: 'web', op: 'connect', id: sourceID });
       const sourceNode: Node | undefined = this.get(sourceID, { payload: QUERY_TYPE.NODE });
       if (!sourceNode) {
         console.warn(`source node with id "${sourceID}" not found`);
@@ -444,7 +445,7 @@ export function Web<TBase extends Mixin>(Base: TBase) {
         return false;
       }
       this.checkLock();
-      this.invalidateBackRefsIndex();
+      this.store.signal({ kind: 'web', op: 'disconnect', id: sourceID });
       const sourceNode: Node | undefined = this.get(sourceID, { payload: QUERY_TYPE.NODE });
       if (!sourceNode) {
         console.warn(`source node with id "${sourceID}" not found`);
@@ -496,7 +497,7 @@ export function Web<TBase extends Mixin>(Base: TBase) {
       kind: REL.REF = REL.REF.REF,
     ): boolean {
       this.checkLock();
-      this.invalidateBackRefsIndex();
+      this.store.signal({ kind: 'web', op: 'retype' });
       const retypes: boolean[] = [];
       for (const node of (this.all({ payload: QUERY_TYPE.NODE }) as Node[] ?? [])) {
         if ((kind === REL.REF.REF) || (kind === REL.REF.ATTR)) {
@@ -525,7 +526,7 @@ export function Web<TBase extends Mixin>(Base: TBase) {
       kind: REL.REF = REL.REF.REF,
     ): boolean {
       this.checkLock();
-      this.invalidateBackRefsIndex();
+      this.store.signal({ kind: 'web', op: 'transfer', id: sourceID });
       if (sourceID === targetID) {
         console.warn('source and target are the same');
         return false;
