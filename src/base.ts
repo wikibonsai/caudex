@@ -13,6 +13,7 @@ import type {
 } from './types';
 import { NODE, QUERY_TYPE } from './const';
 import { Node } from './node';
+import { NodeStore } from './store';
 
 
 export class Base {
@@ -21,10 +22,11 @@ export class Base {
   //  dereference: class methods   -- 'this.get(childID)'
 
   // note: mixins don't work with protected/private properties...
-  public index: Record<string, Node>;                                    // the core index instance
-  public uniqKeyMap: Record<string, Record<string, string>> | undefined; // node data properties that are unique get a hash value for faster access
+  // ...so encapsulation lives in the store (a collaborator outside the mixin
+  // chain); 'index' / 'uniqKeyMap' / 'uniqKeys' are live delegating views kept
+  // for back-compat until internals go private (composition refactor, phase 3).
+  public store: NodeStore;                                               // the StoragePort: node store + unique-key lookup
   // key opts
-  public uniqKeys: string[] = [];                                        // node data key that should be unique
   public zombieKey: string = '';                                         // node data key that should be unique across zombies too
   // async opts
   public useLock: boolean;                                               // whether index should be thread-safe
@@ -34,6 +36,20 @@ export class Base {
   // items that failed to add during construction under onInitError: 'collect'
   public readonly initErrors: InitError[] = [];
 
+  // live views over the store (see note on 'store' above)
+
+  public get index(): Record<string, Node> {
+    return this.store.nodes;
+  }
+
+  public get uniqKeyMap(): Record<string, Record<string, string>> | undefined {
+    return this.store.uniqKeyMap;
+  }
+
+  public get uniqKeys(): string[] {
+    return this.store.uniqKeys;
+  }
+
   constructor(items: BaseNodeData[] | any[], opts?: Partial<CaudexOpts>) {
     // go
     // options
@@ -41,13 +57,6 @@ export class Base {
       // unique node data keys
       if (!opts.uniqKeys) {
         console.warn('no "uniqKeys" given, this may effect access speeds in some cases');
-        this.uniqKeyMap = undefined;
-      } else {
-        this.uniqKeys = opts.uniqKeys;
-        this.uniqKeyMap = {};
-        for (const key of this.uniqKeys) {
-          this.uniqKeyMap[key] = {};
-        }
       }
       // todo: force 'zombieKey' to be a 'uniqKeys'?...'query' needs it...
       // zombie handling
@@ -65,8 +74,8 @@ export class Base {
         }
       }
     }
-    // init items; populate nodes
-    this.index = {};
+    // init the store; populate nodes
+    this.store = new NodeStore(opts?.uniqKeys);
     const errorItems: any[] = [];
     for (const item of items) {
       // use tryAdd (not add) so we can capture WHY an item failed to categorize it
@@ -109,14 +118,14 @@ export class Base {
   // (web: backRefsIndex, tree: parentIndex) OVERRIDE this and chain via super() to mark
   // their caches stale on any base-level mutation. Base can't reference those
   // indexes directly (it's the innermost mixin), so it just fires this signal.
-  public onMutate(): void {}
+  public onMutate(): void { /* no-op at base -- no derived indexes of its own to invalidate */ }
 
   public print(printout: boolean = true): string {
     this.checkLock();
     if (printout) {
-      console.log(JSON.stringify(this.index));
+      console.log(this.store.serialize());
     }
-    return JSON.stringify(this.index);
+    return this.store.serialize();
   }
 
 
@@ -133,7 +142,7 @@ export class Base {
   }
 
   protected resolvePayload(id: string, payload: PayloadOpt | undefined, node: Node | undefined): any {
-    const n = node ?? this.index[id];
+    const n = node ?? this.store.get(id);
     if (!n && (payload === QUERY_TYPE.DATA || payload === QUERY_TYPE.NODEKIND || payload === QUERY_TYPE.NODETYPE || (typeof payload === 'string' && payload !== QUERY_TYPE.ID))) {
       return undefined;
     }
@@ -143,21 +152,22 @@ export class Base {
     if (payload === QUERY_TYPE.NODETYPE) { return n?.type; }
     if (payload === QUERY_TYPE.DATA) { return n?.data; }
     if (payload === QUERY_TYPE.ZOMBIE) { return n?.data?.[this.zombieKey]; }
+    const nData: Record<string, any> = n?.data ?? {};
     if (Array.isArray(payload)) {
       const res: Record<string, any> = {};
       for (const key of payload) {
-        res[key] = key in (n?.data ?? {}) ? n!.data[key] : this.execQuery(id, key);
+        res[key] = (key in nData) ? nData[key] : this.execQuery(id, key);
       }
       return res;
     }
-    if (Object.keys(n?.data ?? {}).includes(payload)) { return n!.data[payload]; }
+    if (Object.keys(nData).includes(payload)) { return nData[payload]; }
     return this.execQuery(id, payload);
   }
 
   all(opts?: QueryOpts): string[] | Node[] | any[] | undefined {
     this.checkLock();
     const payload: PayloadOpt = opts?.payload ?? QUERY_TYPE.ID;
-    let nodes: Node[] = Object.values(this.index);
+    let nodes: Node[] = this.store.all();
     nodes = this.applyFilter(nodes, opts?.filter);
     return nodes.map((node: Node) => this.resolvePayload(node.id, payload, node));
   }
@@ -185,7 +195,7 @@ export class Base {
 
   public has(id: string): boolean {
     this.checkLock();
-    return Object.prototype.hasOwnProperty.call(this.index, id);
+    return this.store.has(id);
   }
 
   public flushData(id?: string): boolean {
@@ -211,7 +221,7 @@ export class Base {
     for (const node of (this.all({ payload: QUERY_TYPE.NODE }) as Node[] ?? [])) {
       // delete zombies
       if (node.kind === NODE.KIND.ZOMBIE) {
-        delete this.index[node.id];
+        this.store.delete(node.id);
       // flush
       } else {
         node.flush();
@@ -223,7 +233,7 @@ export class Base {
   public clear(): void {
     this.checkLock();
     this.onMutate();
-    this.index = {};
+    this.store.clear();
   }
 
 
@@ -238,7 +248,7 @@ export class Base {
     this.checkLock();
     for (const key of Object.keys(data)) {
       if (this.uniqKeys.includes(key)) {
-        if (Object.values(this.index).find((node) =>
+        if (this.store.all().find((node) =>
           (node.data[key] === data[key]) && (node.id !== id)
         )) {
           console.warn(`data key "${key}" with value "${data[key]}" already exists`);
@@ -282,10 +292,8 @@ export class Base {
         undefined,
         zombieData,
       );
-      this.index[zombieNode.id] = zombieNode;
-      if (this.uniqKeyMap) {
-        this.uniqKeyMap[this.zombieKey][data] = zombieNode.id;
-      }
+      this.store.put(zombieNode);
+      this.store.indexKey(this.zombieKey, data, zombieNode.id);
       return { node: zombieNode };
     }
     // default-case
@@ -305,13 +313,13 @@ export class Base {
     const type: string    = (init && init.type) ? init.type : NODE.TYPE.DEFAULT;
     // init
     const newNode: Node = new Node(id, kind, type, data);
-    this.index[newNode.id] = newNode;
+    this.store.put(newNode);
     // populate 'uniqKeyMap'
     for (const key of Object.keys(data)) {
       if (this.uniqKeyMap
       && Object.keys(this.uniqKeyMap).includes(key)
       ) {
-        this.uniqKeyMap[key][data[key]] = id;
+        this.store.indexKey(key, data[key], id);
       }
     }
     return { node: newNode };
@@ -321,7 +329,7 @@ export class Base {
 
   public edit(id: string, key: any, newValue: any): boolean {
     this.checkLock();
-    const node: Node | undefined = this.index[id];
+    const node: Node | undefined = this.store.get(id);
     if (node === undefined) {
       console.warn(`node with id "${id}" does not exist`);
       return false;
@@ -332,8 +340,8 @@ export class Base {
     } else {
       const data: any = node.data;
       if (this.uniqKeyMap && this.uniqKeys.includes(key)) {
-        delete this.uniqKeyMap[key][data[key]];
-        this.uniqKeyMap[key][newValue] = id;
+        this.store.deindexKey(key, data[key]);
+        this.store.indexKey(key, newValue, id);
       }
       data[key] = newValue;
       if (!this.validate(data, id)) { return false; }
@@ -355,46 +363,49 @@ export class Base {
       if (this.uniqKeyMap
       && Object.keys(this.uniqKeyMap).includes(key)
       ) {
-        this.uniqKeyMap[key][data[key]] = id;
+        this.store.indexKey(key, data[key], id);
       }
     }
-    this.index[id].data = data;
-    this.index[id].kind = data.kind ? data.kind : NODE.KIND.DOC;
-    this.index[id].type = data.type ? data.type : NODE.TYPE.DEFAULT;
-    return this.index[id];
+    const node: Node = this.store.get(id) as Node;
+    node.data = data;
+    node.kind = data.kind ? data.kind : NODE.KIND.DOC;
+    node.type = data.type ? data.type : NODE.TYPE.DEFAULT;
+    return node;
   }
 
   // get
 
   public get(id: string, opts?: QueryOpts): Node | any | undefined {
     this.checkLock();
-    if (!this.index[id]) {
+    const node: Node | undefined = this.store.get(id);
+    if (!node) {
       console.warn(`node with id "${id}" does not exist`);
       return undefined;
     }
     const payload: PayloadOpt = opts?.payload ?? QUERY_TYPE.NODE;
-    return this.resolvePayload(id, payload, this.index[id]);
+    return this.resolvePayload(id, payload, node);
   }
 
   public execQuery(id: string, qType: string): any {
     this.checkLock();
+    const node: Node = this.store.get(id) as Node;
     if (qType === QUERY_TYPE.ID) {
       return id;
     } else if (qType === QUERY_TYPE.NODE) {
-      return this.index[id];
+      return node;
     } else if (qType === QUERY_TYPE.NODEKIND) {
-      return this.index[id].kind;
+      return node.kind;
     } else if (qType === QUERY_TYPE.NODETYPE) {
-      return this.index[id].type;
+      return node.type;
     // todo: make it possible to have a query type for dynamically defined data keys
     } else if (qType === QUERY_TYPE.DATA) {
-      return this.index[id].data;
+      return node.data;
     } else if (qType === QUERY_TYPE.ZOMBIE) {
-      return this.index[id].data[this.zombieKey];
-    } else if (Object.keys(this.index[id].data).includes(qType)) {
-      return this.index[id].data[qType];
+      return node.data[this.zombieKey];
+    } else if (Object.keys(node.data).includes(qType)) {
+      return node.data[qType];
     } else {
-      if (!this.index[id].data[this.zombieKey]) {
+      if (!node.data[this.zombieKey]) {
         console.warn(`query failed for id "${id}" with type '${qType}'`);
       }
       // todo: ...?
@@ -413,10 +424,10 @@ export class Base {
       return undefined;
     }
     if (this.uniqKeyMap && Object.keys(this.uniqKeyMap).includes(key)) {
-      const id: string = this.uniqKeyMap[key][value];
-      return this.index[id];
+      const id: string | undefined = this.store.findIDByKey(key, value);
+      return (id === undefined) ? undefined : this.store.get(id);
     }
-    return Object.values(this.index).find((node: Node) => {
+    return this.store.all().find((node: Node) => {
       return (node.data[key] && (node.data[key] === value));
     });
   }
@@ -424,15 +435,15 @@ export class Base {
   public filter(key: any, value: any): Node[] | undefined {
     this.checkLock();
     if (key === QUERY_TYPE.NODEKIND) {
-      return Object.values(this.index).filter((node: Node) => {
+      return this.store.all().filter((node: Node) => {
         return node.kind === value;
       });
     } else if (key === QUERY_TYPE.NODETYPE) {
-      return Object.values(this.index).filter((node: Node) => {
+      return this.store.all().filter((node: Node) => {
         return node.type === value;
       });
     } else {
-      return Object.values(this.index).filter((node: Node) => {
+      return this.store.all().filter((node: Node) => {
         return node.data[key] && node.data[key] === value;
       });
     }
@@ -455,10 +466,10 @@ export class Base {
     if (!hasRel) {
       for (const key of Object.keys(node.data)) {
         if (this.uniqKeyMap && Object.keys(this.uniqKeyMap).includes(key)) {
-          delete this.uniqKeyMap[key][node.data[key]];
+          this.store.deindexKey(key, node.data[key]);
         }
       }
-      delete this.index[id];
+      this.store.delete(id);
       if (!this.has(id)) { return true; }
     // todo: when we are just about to cleanup relationships, 'hasRel' will be true, but only for nodes that are about to be deleted.
     } else {
@@ -467,7 +478,7 @@ export class Base {
             Object.keys(this.uniqKeyMap).includes(key) &&
             (key !== this.zombieKey)
         ) {
-          delete this.uniqKeyMap[key][node.data[key]];
+          this.store.deindexKey(key, node.data[key]);
         }
       }
       const zombieData = node.data[this.zombieKey];

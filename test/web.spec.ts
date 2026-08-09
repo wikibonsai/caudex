@@ -748,9 +748,9 @@ describe('web', () => {
           wiki.index['1'].attrs['a'] = new Set(['2']);
           wiki.index['1'].links.push({ type: 't', id: '3' });
           wiki.index['1'].embeds.push({ id: '4', media: NODE.MEDIA.MARKDOWN });
-          const out = wiki.neighbors('1');
-          assert.strictEqual(out!.length, 3);
-          assert.ok(out!.includes('2') && out!.includes('3') && out!.includes('4'));
+          const out = wiki.neighbors('1') as string[];
+          assert.strictEqual(out.length, 3);
+          assert.ok(out.includes('2') && out.includes('3') && out.includes('4'));
         });
 
         it('neighbors filter by kind link', () => {

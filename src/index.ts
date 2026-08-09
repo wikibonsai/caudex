@@ -6,6 +6,8 @@ export { Base } from './base';
 export { Web } from './web';
 export { Tree } from './tree';
 export { Node } from './node';
+export { NodeStore } from './store';
+export type { StoragePort } from './store';
 export * from './const';
 export type { FilterOpts, PayloadOpt, QueryOpts, ConnectOpts, DisconnectOpts } from './types';
 

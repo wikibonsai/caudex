@@ -522,8 +522,8 @@ describe('tree', () => {
 
         it('descendants with filter: relation list is not filtered; full descendants returned', () => {
           assert.deepEqual(bonsai.descendants('1'), ['2', '3', '4']);
-          const withFilter = bonsai.descendants('1', { filter: { filename: 'two' } });
-          assert.strictEqual(withFilter!.length, 3, 'filter does not restrict relation list');
+          const withFilter = bonsai.descendants('1', { filter: { filename: 'two' } }) as string[];
+          assert.strictEqual(withFilter.length, 3, 'filter does not restrict relation list');
         });
 
         it('lineage with filter: relation list is not filtered; full lineage returned', () => {
@@ -657,7 +657,7 @@ describe('tree', () => {
           bonsai.index['3'].type = 'index';
           bonsai.index['4'].type = 'entry';
           const out = bonsai.descendants('1', { filter: { nodeType: 'entry' } }) as string[];
-          assert.strictEqual(out!.length, 3, 'filter does not restrict relation list');
+          assert.strictEqual(out.length, 3, 'filter does not restrict relation list');
         });
 
         it('ancestors with filter returns full list; filter not applied', () => {

@@ -4,7 +4,7 @@ import sinon from 'sinon';
 import nanoid from 'nanoid';
 
 import type { Attrs, Embeds, Links } from '../src/types';
-import { Caudex, Node, NODE, QUERY_TYPE, REL } from '../src/index';
+import { Caudex, Node, NODE, REL } from '../src/index';
 
 
 // use-case / workflow map
