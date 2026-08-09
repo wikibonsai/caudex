@@ -1148,6 +1148,24 @@ describe('base', () => {
           }
         });
 
+        it('node exists; has relationships (backembeds); zombify', () => {
+          // before
+          const node: Node | undefined = base.get('2');
+          if (node === undefined) { assert.fail('test node should not be \'undefined\''); }
+          node.embeds = [{
+            id: '1',
+            media: NODE.MEDIA.MARKDOWN,
+          }];
+          // go
+          assert.strictEqual(base.rm('1'), true);
+          // after: an embed is a reference like any other -- the node must
+          // zombify (keeping the embed target resolvable), not vanish outright
+          assert.strictEqual(base.has('1'), true);
+          const zombieNode: Node | undefined = base.get('1');
+          if (zombieNode === undefined) { assert.fail(); }
+          assert.deepEqual(zombieNode.kind, NODE.KIND.ZOMBIE);
+        });
+
         it('node exists; has relationships (attributed); zombify', () => {
           // before
           const node: Node | undefined = base.get('2');

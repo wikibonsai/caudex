@@ -462,7 +462,7 @@ export class Base {
     }
     this.onMutate('rm', id);
     const hasRel: boolean = (this.all({ payload: QUERY_TYPE.NODE }) as Node[] ?? []).some((n) =>
-      (n.id !== id) && (n.inChildren(id) || n.inAttrs(id) || n.inLinks(id))
+      (n.id !== id) && (n.inChildren(id) || n.inAttrs(id) || n.inLinks(id) || n.inEmbeds(id))
     );
     // if other nodes reference this node, just delete data
     if (!hasRel) {
