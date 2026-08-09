@@ -2,6 +2,7 @@ import type { Attrs, BackRefs, ConnectOpts, DisconnectOpts, Embed, Embeds, Link,
 import { DATA_STRUCT, NODE, QUERY_TYPE, EDGE } from './const';
 import { Node } from './node';
 import { DerivedIndex, StoragePort } from './store';
+import { Edge, EdgeQueryOpts, edgesProjector } from './edge';
 
 
 export function Web<TBase extends Mixin>(Base: TBase) {
@@ -39,6 +40,13 @@ export function Web<TBase extends Mixin>(Base: TBase) {
         return { attr, link, embed };
       },
       { scopes: ['node', 'web'] },
+    );
+
+    // the edges view -- web relations reified as normalized Edge objects (see
+    // edge.ts). Same registration pattern as backRefsIndex: derived, scoped to
+    // {node, web} so tree-only mutations leave it warm.
+    public edgesIndex: DerivedIndex<Edge[]> = this.store.defineIndex(
+      'edges', edgesProjector, { scopes: ['node', 'web'] },
     );
 
     public get backRefsIndexDirty(): boolean {
@@ -119,6 +127,21 @@ export function Web<TBase extends Mixin>(Base: TBase) {
     // // define
     // forerefs(id: string, query: string | string[] = QueryType.id): Attrs | Record<string, Node[]> | Record<string, any> | undefined {
     // }
+
+    // every web relationship as a normalized Edge object, optionally filtered
+    // by source / target / kind / type / header. A fresh array is returned
+    // (the cached projection is never handed out directly).
+    edges(opts?: EdgeQueryOpts): Edge[] {
+      this.checkLock();
+      const all: Edge[] = this.edgesIndex.ensure(this.store);
+      return all.filter((edge: Edge) =>
+        ((opts?.source === undefined) || (edge.source === opts.source))
+        && ((opts?.target === undefined) || (edge.target === opts.target))
+        && ((opts?.kind === undefined) || (edge.kind === opts.kind))
+        && ((opts?.type === undefined) || (edge.type === opts.type))
+        && ((opts?.header === undefined) || (edge.header === opts.header))
+      );
+    }
 
     // all nodes that reference `id` via ANY ref kind (attr / link / embed) — the union
     // of backattrs/backlinks/backembeds sources, read straight off the backRefsIndex.
@@ -369,7 +392,7 @@ export function Web<TBase extends Mixin>(Base: TBase) {
           media: optsOrKind === EDGE.KIND.EMBED ? (typeOrMedia as NODE.MEDIA | undefined) : undefined,
         }
         : optsOrKind as ConnectOpts;
-      const { kind, type = '', header, media } = opts;
+      const { kind, type = '', header, media, position } = opts;
       if (kind === EDGE.KIND.REF) {
         console.warn('please connect to a more specific relationship(\'EDGE.KIND.ATTR\', \'EDGE.KIND.LINK\', or \'EDGE.KIND.EMBED\'');
         return false;
@@ -397,14 +420,17 @@ export function Web<TBase extends Mixin>(Base: TBase) {
         return sourceNode.attrs[type].has(targetID);
       }
       if (kind === EDGE.KIND.LINK) {
+        // occurrence identity: same (type, target, header) at a DIFFERENT
+        // position is a distinct occurrence, not a duplicate.
         const hasLink = sourceNode.links.find((link: Link) =>
-          link.type === type && link.id === targetID && link.header === header
+          link.type === type && link.id === targetID && link.header === header && link.position === position
         );
         if (hasLink === undefined) {
           sourceNode.links.push({
             type,
             id: targetID,
             ...(header !== undefined && { header }),
+            ...(position !== undefined && { position }),
           } as Link);
         }
         return true;
@@ -416,13 +442,14 @@ export function Web<TBase extends Mixin>(Base: TBase) {
           return false;
         }
         const hasEmbed = sourceNode.embeds.find((embed: Embed) =>
-          embed.media === media && embed.id === targetID && embed.header === header
+          embed.media === media && embed.id === targetID && embed.header === header && embed.position === position
         );
         if (hasEmbed === undefined) {
           sourceNode.embeds.push({
             id: targetID,
             ...(media !== undefined && { media }),
             ...(header !== undefined && { header }),
+            ...(position !== undefined && { position }),
           } as Embed);
         }
         return true;
@@ -441,7 +468,7 @@ export function Web<TBase extends Mixin>(Base: TBase) {
           media: optsOrKind === EDGE.KIND.EMBED ? (typeOrMedia as NODE.MEDIA | undefined) : undefined,
         }
         : optsOrKind as DisconnectOpts;
-      const { kind, type = '', header, media } = opts;
+      const { kind, type = '', header, media, position } = opts;
       if (kind === EDGE.KIND.REF) {
         console.warn('please disconnect a more specific relationship(\'EDGE.KIND.ATTR\', \'EDGE.KIND.LINK\', or \'EDGE.KIND.EMBED\'');
         return false;
@@ -465,28 +492,35 @@ export function Web<TBase extends Mixin>(Base: TBase) {
         sourceNode.attrs[type]?.delete(targetID);
         return !sourceNode.attrs[type]?.has(targetID);
       }
+      // occurrence targeting: a given position removes ONLY that occurrence;
+      // omitted position is position-BLIND (removes the first match regardless
+      // of anchor -- back-compat with pre-position callers).
       if (kind === EDGE.KIND.LINK) {
         for (let i = 0; i < sourceNode.links.length; i++) {
           const l = sourceNode.links[i];
-          if (l.id === targetID && l.type === type && l.header === header) {
+          if (l.id === targetID && l.type === type && l.header === header
+            && ((position === undefined) || (l.position === position))) {
             sourceNode.links.splice(i, 1);
             return true;
           }
         }
         return !sourceNode.links.find((link: Link) =>
           link.type === type && link.id === targetID && link.header === header
+          && ((position === undefined) || (link.position === position))
         );
       }
       if (kind === EDGE.KIND.EMBED) {
         for (let i = 0; i < sourceNode.embeds.length; i++) {
           const e = sourceNode.embeds[i];
-          if (e.id === targetID && e.media === media && e.header === header) {
+          if (e.id === targetID && e.media === media && e.header === header
+            && ((position === undefined) || (e.position === position))) {
             sourceNode.embeds.splice(i, 1);
             return true;
           }
         }
         return !sourceNode.embeds.find((embed: Embed) =>
           embed.media === media && embed.id === targetID && embed.header === header
+          && ((position === undefined) || (embed.position === position))
         );
       }
       return false;

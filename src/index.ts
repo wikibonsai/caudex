@@ -8,6 +8,7 @@ export { Tree } from './tree';
 export { Node } from './node';
 export { DerivedIndex, NodeStore } from './store';
 export type { ChangeEvent, ChangeKind, ChangeListener, DefineIndexOpts, StoragePort } from './store';
+export type { Edge, EdgeQueryOpts } from './edge';
 export * from './const';
 export type { FilterOpts, PayloadOpt, QueryOpts, ConnectOpts, DisconnectOpts } from './types';
 

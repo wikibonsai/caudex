@@ -68,14 +68,16 @@ export interface Link {
   id: string;
   type: string | undefined;
   header?: string | undefined;
+  position?: number;    // occurrence offset in the source doc (see 'Edge')
   // block?: string | undefined;
   // label: boolean;
 }
 
 export interface Embed {
   id: string;
-  media?: NODE.MEDIA;   // absent = doc-embed (markdown is not a media kind)
+  media?: NODE.MEDIA;   // absent = note-transclusion (markdown is not a media kind)
   header?: string | undefined;
+  position?: number;    // occurrence offset in the source doc (see 'Edge')
 }
 
 // collections
@@ -129,6 +131,7 @@ export interface ConnectOpts {
   type?: string;
   header?: string;
   media?: NODE.MEDIA;
+  position?: number;    // occurrence offset (links/embeds; attrs ignore it -- set semantics)
 }
 
 export type DisconnectOpts = ConnectOpts;
