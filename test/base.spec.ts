@@ -1154,7 +1154,6 @@ describe('base', () => {
           if (node === undefined) { assert.fail('test node should not be \'undefined\''); }
           node.embeds = [{
             id: '1',
-            media: NODE.MEDIA.MARKDOWN,
           }];
           // go
           assert.strictEqual(base.rm('1'), true);

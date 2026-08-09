@@ -74,7 +74,7 @@ export interface Link {
 
 export interface Embed {
   id: string;
-  media: NODE.MEDIA;
+  media?: NODE.MEDIA;   // absent = doc-embed (markdown is not a media kind)
   header?: string | undefined;
 }
 

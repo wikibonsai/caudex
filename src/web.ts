@@ -267,7 +267,7 @@ export function Web<TBase extends Mixin>(Base: TBase) {
           if (f?.level === REL.LEVEL.HEADER && !embed.header) { continue; }
           backembeds.push({
             id: node.id,
-            media: embed.media ?? NODE.MEDIA.MARKDOWN,
+            ...(embed.media !== undefined && { media: embed.media }),
             ...(embed.header !== undefined && { header: embed.header }),
           } as Embed);
         }
@@ -365,7 +365,8 @@ export function Web<TBase extends Mixin>(Base: TBase) {
         ? {
           kind: optsOrKind,
           type: optsOrKind === REL.REF.EMBED ? undefined : (typeOrMedia ?? ''),
-          media: optsOrKind === REL.REF.EMBED ? (typeOrMedia as NODE.MEDIA) ?? NODE.MEDIA.MARKDOWN : undefined,
+          // media stays undefined for doc-embeds (markdown is not a media kind)
+          media: optsOrKind === REL.REF.EMBED ? (typeOrMedia as NODE.MEDIA | undefined) : undefined,
         }
         : optsOrKind as ConnectOpts;
       const { kind, type = '', header, media } = opts;
@@ -409,18 +410,18 @@ export function Web<TBase extends Mixin>(Base: TBase) {
         return true;
       }
       if (kind === REL.REF.EMBED) {
-        const resolvedMedia = media ?? NODE.MEDIA.MARKDOWN;
-        if (resolvedMedia !== NODE.MEDIA.MARKDOWN && !Object.values(NODE.MEDIA).includes(resolvedMedia)) {
-          console.warn('invalid media kind: ' + resolvedMedia);
+        // media-absence = doc-embed; a given media must be a real media kind
+        if ((media !== undefined) && !Object.values(NODE.MEDIA).includes(media)) {
+          console.warn('invalid media kind: ' + media);
           return false;
         }
         const hasEmbed = sourceNode.embeds.find((embed: Embed) =>
-          embed.media === resolvedMedia && embed.id === targetID && embed.header === header
+          embed.media === media && embed.id === targetID && embed.header === header
         );
         if (hasEmbed === undefined) {
           sourceNode.embeds.push({
-            media: resolvedMedia,
             id: targetID,
+            ...(media !== undefined && { media }),
             ...(header !== undefined && { header }),
           } as Embed);
         }
@@ -436,7 +437,8 @@ export function Web<TBase extends Mixin>(Base: TBase) {
         ? {
           kind: optsOrKind,
           type: optsOrKind === REL.REF.EMBED ? undefined : (typeOrMedia ?? ''),
-          media: optsOrKind === REL.REF.EMBED ? (typeOrMedia as NODE.MEDIA) ?? NODE.MEDIA.MARKDOWN : undefined,
+          // media stays undefined for doc-embeds (markdown is not a media kind)
+          media: optsOrKind === REL.REF.EMBED ? (typeOrMedia as NODE.MEDIA | undefined) : undefined,
         }
         : optsOrKind as DisconnectOpts;
       const { kind, type = '', header, media } = opts;
@@ -476,16 +478,15 @@ export function Web<TBase extends Mixin>(Base: TBase) {
         );
       }
       if (kind === REL.REF.EMBED) {
-        const resolvedMedia = media ?? NODE.MEDIA.MARKDOWN;
         for (let i = 0; i < sourceNode.embeds.length; i++) {
           const e = sourceNode.embeds[i];
-          if (e.id === targetID && e.media === resolvedMedia && e.header === header) {
+          if (e.id === targetID && e.media === media && e.header === header) {
             sourceNode.embeds.splice(i, 1);
             return true;
           }
         }
         return !sourceNode.embeds.find((embed: Embed) =>
-          embed.media === (media ?? NODE.MEDIA.MARKDOWN) && embed.id === targetID && embed.header === header
+          embed.media === media && embed.id === targetID && embed.header === header
         );
       }
       return false;

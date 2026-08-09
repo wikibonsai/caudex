@@ -27,7 +27,6 @@ describe('node', () => {
     }];
     node.embeds = [{
       id: '5',
-      media: NODE.MEDIA.MARKDOWN,
     }];
   });
 
@@ -126,8 +125,8 @@ describe('node', () => {
 
     it('inEmbeds() with header', () => {
       node.embeds = [
-        { id: '5', media: NODE.MEDIA.MARKDOWN },
-        { id: '5', media: NODE.MEDIA.MARKDOWN, header: 'intro' },
+        { id: '5' },
+        { id: '5', header: 'intro' },
       ];
       assert.strictEqual(node.inEmbeds('5'), true);
       assert.strictEqual(node.inEmbeds('5', 'intro'), true);
@@ -136,7 +135,7 @@ describe('node', () => {
     });
 
     it('inEmbeds() without header: does not filter by header; any embed to id matches', () => {
-      node.embeds = [{ id: '5', media: NODE.MEDIA.MARKDOWN, header: 'intro' }];
+      node.embeds = [{ id: '5', header: 'intro' }];
       assert.strictEqual(node.inEmbeds('5'), true, 'omitting header returns true if any embed to id exists');
       assert.strictEqual(node.inEmbeds('5', undefined), true);
     });

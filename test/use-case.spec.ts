@@ -340,12 +340,12 @@ describe('use-case', () => {
       wb.connect('1', '2', REL.REF.EMBED);
       wb.connect('3', '2', REL.REF.EMBED);
       assert.deepEqual(wb.backembeds('2'), [
-        { media: NODE.MEDIA.MARKDOWN, id: '1' },
-        { media: NODE.MEDIA.MARKDOWN, id: '3' },
+        { id: '1' },
+        { id: '3' },
       ] as Embeds);
       // remove one embedder's refs (as an edit-body flush would)
       wb.flushRelRefs('1');
-      assert.deepEqual(wb.backembeds('2'), [{ media: NODE.MEDIA.MARKDOWN, id: '3' }] as Embeds);
+      assert.deepEqual(wb.backembeds('2'), [{ id: '3' }] as Embeds);
     });
 
   });
@@ -393,8 +393,8 @@ describe('use-case', () => {
     it('connects source -> target as an embed', () => {
       // `![[two]]` inside `one.md`
       assert.strictEqual(wb.connect('1', '2', REL.REF.EMBED), true);
-      assert.deepEqual(wb.foreembeds('1'), [{ media: NODE.MEDIA.MARKDOWN, id: '2' }] as Embeds);
-      assert.deepEqual(wb.backembeds('2'), [{ media: NODE.MEDIA.MARKDOWN, id: '1' }] as Embeds);
+      assert.deepEqual(wb.foreembeds('1'), [{ id: '2' }] as Embeds);
+      assert.deepEqual(wb.backembeds('2'), [{ id: '1' }] as Embeds);
     });
 
   });

@@ -27,13 +27,14 @@ export namespace NODE {
     INDEX       = 'index',
   }
 
-  // media kind
+  // media kind -- actual media assets only (same values as wikirefs
+  // CONST.MEDIA). markdown is NOT a media kind: a note-embed is signaled by
+  // media-ABSENCE ('Embed.media' undefined).
   export enum MEDIA {
-    MARKDOWN    = 'markdown',
-    // PDF         = 'pdf',
-    // AUDIO       = 'audio',
-    // IMAGE       = 'image',
-    // VIDEO       = 'video',
+    PDF         = 'pdf',
+    AUDIO       = 'audio',
+    IMAGE       = 'image',
+    VIDEO       = 'video',
   }
 
   // document state (relationship to tree/web)

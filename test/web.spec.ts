@@ -329,15 +329,12 @@ describe('web', () => {
         // before
         wiki.index['1'].embeds.push({
           id: '2',
-          media: NODE.MEDIA.MARKDOWN,
         });
         assert.deepEqual(wiki.foreembeds('1'), [{
           id: '2',
-          media: NODE.MEDIA.MARKDOWN,
         }]);
         assert.deepEqual(wiki.backembeds('2'), [{
           id: '1',
-          media: NODE.MEDIA.MARKDOWN,
         }]);
       });
 
@@ -376,11 +373,9 @@ describe('web', () => {
         wiki.index['1'].embeds = [
           {
             id: '2',
-            media: NODE.MEDIA.MARKDOWN,
           },
           {
             id: '3',
-            media: NODE.MEDIA.MARKDOWN,
           },
         ];
         assert.deepEqual(wiki.foreembeds('1', { payload: ['id', 'uri', 'filename'] }), [
@@ -438,7 +433,6 @@ describe('web', () => {
         // before
         wiki.index['1'].embeds.push({
           id: '2',
-          media: NODE.MEDIA.MARKDOWN,
         });
         assert.deepEqual(wiki.neighbors('1'), ['2']);
         assert.deepEqual(wiki.neighbors('2'), ['1']);
@@ -453,7 +447,6 @@ describe('web', () => {
         });
         wiki.index['1'].embeds.push({
           id: '4',
-          media: NODE.MEDIA.MARKDOWN,
         });
         assert.deepEqual(wiki.neighbors('1', REL.REF.ATTR), ['2']);
         assert.deepEqual(wiki.neighbors('2', REL.REF.ATTR), ['1']);
@@ -470,7 +463,6 @@ describe('web', () => {
         });
         wiki.index['1'].embeds.push({
           id: '4',
-          media: NODE.MEDIA.MARKDOWN,
         });
         assert.deepEqual(wiki.neighbors('1', REL.REF.LINK), ['3']);
         assert.deepEqual(wiki.neighbors('2', REL.REF.LINK), []);
@@ -487,7 +479,6 @@ describe('web', () => {
         });
         wiki.index['1'].embeds.push({
           id: '4',
-          media: NODE.MEDIA.MARKDOWN,
         });
         // assert.deepEqual(wiki.neighbors('1', REL.REF.EMBED), ['4']);
         // assert.deepEqual(wiki.neighbors('2', REL.REF.EMBED), []);
@@ -585,7 +576,7 @@ describe('web', () => {
 
         it('foreembeds with payload id (default)', () => {
           wiki.connect('1', '2', { kind: REL.REF.EMBED });
-          assert.deepEqual(wiki.foreembeds('1'), [{ id: '2', media: NODE.MEDIA.MARKDOWN }]);
+          assert.deepEqual(wiki.foreembeds('1'), [{ id: '2' }]);
         });
 
         it('isolates with payload node', () => {
@@ -747,7 +738,7 @@ describe('web', () => {
         it('neighbors default', () => {
           wiki.index['1'].attrs['a'] = new Set(['2']);
           wiki.index['1'].links.push({ type: 't', id: '3' });
-          wiki.index['1'].embeds.push({ id: '4', media: NODE.MEDIA.MARKDOWN });
+          wiki.index['1'].embeds.push({ id: '4' });
           const out = wiki.neighbors('1') as string[];
           assert.strictEqual(out.length, 3);
           assert.ok(out.includes('2') && out.includes('3') && out.includes('4'));
@@ -756,7 +747,7 @@ describe('web', () => {
         it('neighbors filter by kind link', () => {
           wiki.index['1'].attrs['a'] = new Set(['2']);
           wiki.index['1'].links.push({ type: 't', id: '3' });
-          wiki.index['1'].embeds.push({ id: '4', media: NODE.MEDIA.MARKDOWN });
+          wiki.index['1'].embeds.push({ id: '4' });
           assert.deepEqual(wiki.neighbors('1', { filter: { kind: REL.REF.LINK } }), ['3']);
         });
 
@@ -767,7 +758,7 @@ describe('web', () => {
         });
 
         it('neighbors filter by kind embed', () => {
-          wiki.index['1'].embeds.push({ id: '2', media: NODE.MEDIA.MARKDOWN });
+          wiki.index['1'].embeds.push({ id: '2' });
           assert.deepEqual(wiki.neighbors('1', { filter: { kind: REL.REF.EMBED } }), ['2']);
         });
       });
@@ -1153,74 +1144,72 @@ describe('web', () => {
 
     describe('connect(); embed', () => {
 
-      // todo:
-      // - no 'type' is automatically MEDIA.MARKDOWN
-      // - explicit MEDIA.MARKDOWN
-      // - invalid media kind / 'type'
-      it.skip('media kinds', () => { return; });
+      it('media kinds; media-absence = doc-embed, real kinds validate, junk rejected', () => {
+        // doc-embed: no media arg -> media-absent embed
+        assert.strictEqual(wiki.connect('1', '2', REL.REF.EMBED), true);
+        assert.deepEqual(wiki.index['1'].embeds, [{ id: '2' }]);
+        // media-embed: explicit real kind
+        assert.strictEqual(wiki.connect('1', '3', REL.REF.EMBED, NODE.MEDIA.IMAGE), true);
+        assert.deepEqual(wiki.index['1'].embeds, [{ id: '2' }, { id: '3', media: NODE.MEDIA.IMAGE }]);
+        // invalid media kind rejected ('markdown' is no longer a media kind)
+        assert.strictEqual(wiki.connect('1', '4', REL.REF.EMBED, 'markdown'), false);
+        assert.strictEqual(fakeConsoleWarn.calledWith('invalid media kind: markdown'), true);
+      });
 
       it('base', () => {
         // go
-        assert.strictEqual(wiki.connect('1', '2', REL.REF.EMBED, NODE.MEDIA.MARKDOWN), true);
+        assert.strictEqual(wiki.connect('1', '2', REL.REF.EMBED), true);
         // after
         assert.deepEqual(wiki.foreembeds('1'), [{
           id: '2',
-          media: NODE.MEDIA.MARKDOWN,
         }]);
         assert.deepEqual(wiki.backembeds('2'), [{
           id: '1',
-          media: NODE.MEDIA.MARKDOWN,
         }]);
       });
 
       it('multiples all saved', () => {
         // go
-        assert.strictEqual(wiki.connect('1', '2', REL.REF.EMBED, NODE.MEDIA.MARKDOWN), true);
-        assert.strictEqual(wiki.connect('1', '3', REL.REF.EMBED, NODE.MEDIA.MARKDOWN), true);
+        assert.strictEqual(wiki.connect('1', '2', REL.REF.EMBED), true);
+        assert.strictEqual(wiki.connect('1', '3', REL.REF.EMBED), true);
         // after
         assert.deepEqual(wiki.foreembeds('1'), [{
           id: '2',
-          media: NODE.MEDIA.MARKDOWN,
         },{
           id: '3',
-          media: NODE.MEDIA.MARKDOWN,
         }]);
         assert.deepEqual(wiki.backembeds('2'), [{
           id: '1',
-          media: NODE.MEDIA.MARKDOWN,
         }]);
         assert.deepEqual(wiki.backembeds('3'), [{
           id: '1',
-          media: NODE.MEDIA.MARKDOWN,
         }]);
       });
 
       it('do not store duplicates', () => {
         // go
-        assert.strictEqual(wiki.connect('1', '2', REL.REF.EMBED, NODE.MEDIA.MARKDOWN), true);
-        assert.strictEqual(wiki.connect('1', '2', REL.REF.EMBED, NODE.MEDIA.MARKDOWN), true);
+        assert.strictEqual(wiki.connect('1', '2', REL.REF.EMBED), true);
+        assert.strictEqual(wiki.connect('1', '2', REL.REF.EMBED), true);
         // after
         assert.deepEqual(wiki.foreembeds('1'), [{
           id: '2',
-          media: NODE.MEDIA.MARKDOWN,
         }]);
         assert.deepEqual(wiki.backembeds('2'), [{
           id: '1',
-          media: NODE.MEDIA.MARKDOWN,
         }]);
         assert.deepEqual(wiki.backembeds('3'), []);
       });
 
       it('source node does not exist', () => {
         // go
-        assert.strictEqual(wiki.connect('missing', '2', REL.REF.EMBED, NODE.MEDIA.MARKDOWN), false);
+        assert.strictEqual(wiki.connect('missing', '2', REL.REF.EMBED), false);
         // after
         assert.deepEqual(wiki.backembeds('2'), []);
       });
 
       it('target node does not exist', () => {
         // go
-        assert.strictEqual(wiki.connect('1', 'missing', REL.REF.EMBED, NODE.MEDIA.MARKDOWN), false);
+        assert.strictEqual(wiki.connect('1', 'missing', REL.REF.EMBED), false);
         // after
         assert.deepEqual(wiki.foreembeds('1'), []);
       });
@@ -1229,12 +1218,10 @@ describe('web', () => {
         assert.strictEqual(wiki.connect('1', '2', { kind: REL.REF.EMBED, header: 'intro' }), true);
         assert.deepEqual(wiki.foreembeds('1'), [{
           id: '2',
-          media: NODE.MEDIA.MARKDOWN,
           header: 'intro',
         }]);
         assert.deepEqual(wiki.backembeds('2'), [{
           id: '1',
-          media: NODE.MEDIA.MARKDOWN,
           header: 'intro',
         }]);
       });
@@ -1244,8 +1231,8 @@ describe('web', () => {
         assert.strictEqual(wiki.connect('1', '2', { kind: REL.REF.EMBED, header: 'b' }), true);
         assert.strictEqual(wiki.foreembeds('1').length, 2);
         assert.deepEqual(wiki.foreembeds('1'), [
-          { id: '2', media: NODE.MEDIA.MARKDOWN, header: 'a' },
-          { id: '2', media: NODE.MEDIA.MARKDOWN, header: 'b' },
+          { id: '2', header: 'a' },
+          { id: '2', header: 'b' },
         ]);
       });
 
@@ -1418,7 +1405,6 @@ describe('web', () => {
           id: '2',
         }] as Links;
         wiki.index['1'].embeds = [{
-          media: NODE.MEDIA.MARKDOWN,
           id: '2',
         }] as Embeds;
       });
@@ -1449,7 +1435,6 @@ describe('web', () => {
             id: '2',
           }] as Links);
           assert.deepEqual(targetNode.embeds, [{
-            media: NODE.MEDIA.MARKDOWN,
             id: '2',
           }] as Embeds);
         });
@@ -1505,7 +1490,6 @@ describe('web', () => {
             id: '2',
           }] as Links);
           assert.deepEqual(sourceNode.embeds, [{
-            media: NODE.MEDIA.MARKDOWN,
             id: '2',
           }] as Embeds);
           // target
@@ -1545,7 +1529,6 @@ describe('web', () => {
           });
           assert.deepEqual(sourceNode.links, []);
           assert.deepEqual(sourceNode.embeds, [{
-            media: NODE.MEDIA.MARKDOWN,
             id: '2',
           }] as Embeds);
           // target
@@ -1593,7 +1576,6 @@ describe('web', () => {
           assert.deepEqual(targetNode.attrs, {});
           assert.deepEqual(targetNode.links, []);
           assert.deepEqual(targetNode.embeds, [{
-            media: NODE.MEDIA.MARKDOWN,
             id: '2',
           }] as Embeds);
         });
@@ -1797,20 +1779,17 @@ describe('web', () => {
       it('base (implicit)', () => {
         // before
         wiki.index['1'].embeds = [{
-          media: NODE.MEDIA.MARKDOWN,
           id: '2',
         }];
         // before rm
         assert.deepEqual(wiki.foreembeds('1'), [{
-          media: NODE.MEDIA.MARKDOWN,
           id: '2',
         }]);
         assert.deepEqual(wiki.backembeds('2'), [{
-          media: NODE.MEDIA.MARKDOWN,
           id: '1',
         }]);
         // rm
-        assert.strictEqual(wiki.disconnect('1', '2', REL.REF.EMBED, NODE.MEDIA.MARKDOWN), true);
+        assert.strictEqual(wiki.disconnect('1', '2', REL.REF.EMBED), true);
         // after rm
         assert.deepEqual(wiki.foreembeds('1'), []);
         assert.deepEqual(wiki.backembeds('2'), []);
@@ -1819,12 +1798,10 @@ describe('web', () => {
       it('source node does not exist', () => {
         // before
         wiki.index['1'].embeds = [{
-          media: NODE.MEDIA.MARKDOWN,
           id: '2',
         }];
-        assert.strictEqual(wiki.disconnect('missing', '2', REL.REF.EMBED, NODE.MEDIA.MARKDOWN), false);
+        assert.strictEqual(wiki.disconnect('missing', '2', REL.REF.EMBED), false);
         assert.deepEqual(wiki.backembeds('2'), [{
-          media: NODE.MEDIA.MARKDOWN,
           id: '1',
         }]);
       });
@@ -1832,15 +1809,13 @@ describe('web', () => {
       it('target node does not exist', () => {
         // before
         wiki.index['1'].embeds = [{
-          media: NODE.MEDIA.MARKDOWN,
           id: '2',
         }];
         // go
-        assert.strictEqual(wiki.disconnect('1', 'missing', REL.REF.EMBED, NODE.MEDIA.MARKDOWN), false);
+        assert.strictEqual(wiki.disconnect('1', 'missing', REL.REF.EMBED), false);
         // after
         assert.strictEqual(fakeConsoleWarn.getCall(0).args[0], 'target node with id "missing" not found');
         assert.deepEqual(wiki.foreembeds('1'), [{
-          media: NODE.MEDIA.MARKDOWN,
           id: '2',
         }]);
       });
@@ -1849,7 +1824,7 @@ describe('web', () => {
         wiki.connect('1', '2', { kind: REL.REF.EMBED, header: 'x' });
         wiki.connect('1', '2', { kind: REL.REF.EMBED, header: 'y' });
         assert.strictEqual(wiki.disconnect('1', '2', { kind: REL.REF.EMBED, header: 'x' }), true);
-        assert.deepEqual(wiki.foreembeds('1'), [{ id: '2', media: NODE.MEDIA.MARKDOWN, header: 'y' }]);
+        assert.deepEqual(wiki.foreembeds('1'), [{ id: '2', header: 'y' }]);
       });
 
     });
