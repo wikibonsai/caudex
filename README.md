@@ -11,7 +11,7 @@
 
 An index/db for tracking complex relationships in collections, such as personal [wiki](https://github.com/wikibonsai/wikirefs)s, with support for a [semantic tree](https://github.com/wikibonsai/semtree).
 
-🍄 Cultivate connections in your [🎋 WikiBonsai](https://github.com/wikibonsai/wikibonsai) digital garden.
+🍄 Germinate connections in your [🎋 WikiBonsai](https://github.com/wikibonsai/wikibonsai) digital garden.
 
 ## Install
 
