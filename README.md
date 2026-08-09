@@ -84,11 +84,11 @@ Caudex is synchronously implemented, but asynchronous access can be facilitated 
 ```js
 import { Caudex } from 'caudex';
 
-let opts = { thread: true };
+let opts = { thread: { safe: true } };
 const caudex = new Caudex(fileData, opts);
 ```
 
-Then subsequent calls to `caudex` will use [mutex locks](https://github.com/DirtyHairy/async-mutex) to ensure atomic access to the internal index. Remember to acquire the lock before performing actions on the caudex. For example, a call to [`has()`](https://github.com/wikibonsai/caudex?tab=readme-ov-file#hasid-string-boolean)...
+Then subsequent calls to `caudex` will use [mutex locks](https://github.com/DirtyHairy/async-mutex) to ensure atomic access to the internal index. (An optional `thread.timeout` in milliseconds wraps the lock with a timeout.) Remember to acquire the lock before performing actions on the caudex. For example, a call to [`has()`](https://github.com/wikibonsai/caudex?tab=readme-ov-file#hasid-string-boolean)...
 
 ```ts
 // node with id '1'
@@ -100,11 +100,28 @@ caudex.has('1');
 ```ts
 caudex.lock.acquire()
            .then((release) => { // node with id '1'
-                                const res: boolean = locky.has('1');
+                                const res: boolean = caudex.has('1');
                                 release();
                                 return res;
                               });
 ```
+
+### Change Events
+
+Every mutation signals a typed change event through the caudex's `store`. Subscribe with `onChange()`, which returns an unsubscribe function:
+
+```ts
+const unsubscribe = caudex.store.onChange((e) => {
+  // e: { kind: 'node' | 'tree' | 'web', op: string, id?: string }
+  //   'node' -- the node set changed    (add / rm / fill / flushRels / clear)
+  //   'tree' -- the hierarchy changed   (graft / prune / replace / transplant / flushRelFams)
+  //   'web'  -- the relations changed   (connect / disconnect / retype / transfer / flushRelRefs)
+});
+// ...
+unsubscribe();
+```
+
+The same events drive caudex's internal cache invalidation, so the `kind` is precise: tree-only mutations do not signal `web` and vice versa. Content-only edits (`edit()`, `flushData()`) do not signal.
 
 ## Terms
 
@@ -116,7 +133,7 @@ There is some terminology that will help in understanding the innerworkings of t
 - Tree: A hierarchical structure; good for ordering information.
 - Web: A graph structure; good for associative traversal.
 
-Under the hood, the `caudex` is essentially one hash table whose keys are node ids and values are the nodes themselves. Properties (`all()`) and actions (`add()`, `edit()`, `rm()`) are all functions being run over the hash table to calculate the desired data. This implementation mirrors [pointers](https://en.wikipedia.org/wiki/Pointer_(computer_programming)), since [javascript/typescript doesn't have them](https://stackoverflow.com/questions/17382427/are-there-pointers-in-javascript#:~:text=No%2C%20JS%20doesn't%20have,the%20address%20of%20an%20object.). So, in pointer parlance, to "pass around a reference" you pass around a node id and to "dereference a pointer" in order to obtain the value (node) from the key (node id) in the hash table.
+Under the hood, the `caudex` is essentially one hash table whose keys are node ids and values are the nodes themselves. (Concretely, that hash table lives in a `NodeStore` collaborator behind a `StoragePort` interface, and derived caches -- the tree's parent index, the web's back-ref index -- are `DerivedIndex` projections over it, kept fresh by the change events described above.) Properties (`all()`) and actions (`add()`, `edit()`, `rm()`) are all functions being run over the hash table to calculate the desired data. This implementation mirrors [pointers](https://en.wikipedia.org/wiki/Pointer_(computer_programming)), since [javascript/typescript doesn't have them](https://stackoverflow.com/questions/17382427/are-there-pointers-in-javascript#:~:text=No%2C%20JS%20doesn't%20have,the%20address%20of%20an%20object.). So, in pointer parlance, to "pass around a reference" you pass around a node id and to "dereference a pointer" in order to obtain the value (node) from the key (node id) in the hash table.
 
 Mirroring pointer behavior allows for implementing tree and graph data structures that are truer to form. And, since most everything is a function, tree and web related functions are grouped into mix-ins that can be used (or not) based on need. By using the main `caudex`, which contains both `tree` and `web` functions, a hybrid tree-web data structure can be leveraged. ("web" can be thought of as synonymous with the computer science "graph" data structure)
 
@@ -224,11 +241,11 @@ Remove / delete a node from the caudex with the given `id`. Returns `true` if th
 
 Returns the id of the root of the tree or `undefined` if none is set.
 
-##### `orphans(treeIDs: string[]): string[] | undefined`
+##### `orphans([treeIDs: string[]]): string[] | undefined`
 
 Returns all of the ids of orphan nodes in the tree of the caudex.
 
-`treeIDs` defines what nodes should be considered part of the tree.
+`treeIDs` optionally restricts which nodes should be considered; when omitted, every node in the caudex is checked.
 
 #### Relational Properties
 
@@ -272,9 +289,9 @@ Graft a node with the given `childID` to another node with the given `parentID`.
 
 To perform subtree-sized changes, see [`transplant()`](https://github.com/wikibonsai/caudex/?tab=readme-ov-file#transplantsubrootid-string-subtree--id-string-children-string--boolean).
 
-##### `replace(source: string, target: string): Node | undefined`
+##### `replace(source: string, target: string): boolean`
 
-Replace a `source` node's position in the tree with the `target` node via their IDs. The updated target node is returned on success.
+Replace a `source` node's position in the tree with the `target` node via their IDs. Returns `true` on success.
 
 ##### `transplant(subrootID: string, subtree: { id: string, children: string[] }[]): boolean`
 
@@ -314,7 +331,9 @@ Return all linktypes in the caudex.
 
 ##### (⚠️ coming soon!) `forerefs(id: string): Attrs | undefined`
 
-##### (⚠️ coming soon!) `backrefs(id: string): Attrs | undefined`
+##### `backrefs(id: string): string[] | undefined`
+
+Returns node ids for **all** nodes that reference the given node id via any ref kind -- the union of `backattrs` / `backlinks` / `backembeds` sources.
 
 ##### `foreattrs(id: string): Attrs | undefined`
 
@@ -352,27 +371,35 @@ Flush / delete all reference relationships. If no id is given, flush all referen
 
 (Useful for file deletions)
 
-##### `connect(source: string, target: string, ref: REL.REF, type: string = ''): boolean`
+##### `connect(source: string, target: string, opts: ConnectOpts | REL.REF[, typeOrMedia: string]): boolean`
 
-Connect a `source` node id to a `target` node id via the given `ref` kind (`attr` or `link`) and `type` text.
+Connect a `source` node id to a `target` node id. Either pass the ref kind positionally with a type (or media, for embeds)...
+
+```ts
+caudex.connect('1', '2', REL.REF.LINK, 'linktype');
+caudex.connect('1', '2', REL.REF.ATTR, 'attrtype');
+caudex.connect('1', '2', REL.REF.EMBED);            // media defaults to markdown
+```
+
+...or pass a `ConnectOpts` object (`{ kind, type?, header?, media? }`) -- `header` scopes a link/embed to a header section (attrs do not support headers); `media` picks the embed media kind.
 
 (Useful for file and link creation)
 
-##### `retype(oldType: string, newType: string[, type: REL.REF]): boolean`
+##### `retype(oldType: string, newType: string[, kind: REL.REF]): boolean`
 
-#todo
+Rename the reference type `oldType` to `newType` across every node. `kind` restricts the rename to attrs (`REL.REF.ATTR`) or links (`REL.REF.LINK`); the default (`REL.REF.REF`) renames both. Returns `true` if all renames succeeded.
 
 (Useful for attribute renames)
 
-##### `transfer(source: string, target: string, kind: REL.REF = REL.REF.REF): Node | undefined`
+##### `transfer(source: string, target: string, kind: REL.REF = REL.REF.REF): boolean`
 
-Transfer the relationships from the `source` node to the `target` node via their IDs. Kind of relationships to transfer can be filtered by the `kind` var. Returns the target node on successful transfer.
+Transfer the relationships from the `source` node to the `target` node via their IDs. Kind of relationships to transfer can be filtered by the `kind` var. Returns `true` on successful transfer.
 
 (Useful for file renames)
 
-##### `disconnect(source: string, target: string, ref: REL.REF, type: string = ''): boolean`
+##### `disconnect(source: string, target: string, opts: DisconnectOpts | REL.REF[, typeOrMedia: string]): boolean`
 
-Disconnect a `source` node id from a `target` node id of the given `ref` kind (`attr` or `link`) and `type` text.
+Disconnect a `source` node id from a `target` node id. Accepts the same positional and options forms as `connect()`.
 
 
 [^inspire]: Logo inspired by [databases](https://cdn-icons-png.flaticon.com/512/20/20093.png) and [caudexes](https://www.google.com/search?q=caudex&source=lnms&tbm=isch&sa=X&ved=2ahUKEwiD_LbPwr36AhUsRTABHdXOBq0Q_AUoAXoECAIQAw&biw=1011&bih=800&dpr=2) -- especially [this one](https://thumbs.dreamstime.com/z/adenium-shrub-branched-caudex-green-foliage-illustration-colored-pencils-229255411.jpg).
