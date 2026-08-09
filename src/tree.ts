@@ -81,24 +81,11 @@ export function Tree<TBase extends Mixin>(Base: TBase) {
       return this.get(this._root, opts !== undefined ? opts : { payload: QUERY_TYPE.ID });
     }
 
-    // 'treeIDs' optionally restricts the candidate set; the attachment test itself
-    // is pure index state (setRoot/graft own the tree), so the default is simply
-    // "every node".
-    orphans(treeIDs?: string[], opts?: QueryOpts): string[] | Node[] | any[] | undefined {
-      this.checkLock();
-      const payload = opts?.payload ?? QUERY_TYPE.ID;
-      /* eslint-disable indent */
-      return (this.all({ ...opts, payload: QUERY_TYPE.NODE }) as Node[] ?? [])
-                 .filter((node: Node) =>
-                    ((treeIDs === undefined) || treeIDs.includes(node.id))
-                    && (node.children.length === 0)
-                    && !this.parent(node.id)
-                    && (node.kind !== NODE.KIND.ZOMBIE)
-                 ).map((node: Node) =>
-                   this.get(node.id, { ...opts, payload })
-                 );
-      /* eslint-enable indent */
-    }
+    // note: the phase bulk queries (phases/integrated/orphans/wallflowers/
+    // isolates) live in phase.ts, and per-node phase on the node itself
+    // ('node.phase()') -- phase partitions nodes across BOTH the tree and web
+    // attachment axes. (the old tree-only 'orphans(treeIDs)' -- "leaf with no
+    // parent" -- was the single-axis meaning the TERMS reorg retired.)
 
     ancestors(id: string, opts?: QueryOpts): string[] | Node[] | any[] | undefined {
       this.checkLock();
@@ -295,7 +282,7 @@ export function Tree<TBase extends Mixin>(Base: TBase) {
       // NOT stale backRefsIndex — tree-kind leaves web-scoped indexes alone.)
       this.store.signal({ kind: 'tree', op: 'flushTree' });
       for (const node of (this.all({ payload: QUERY_TYPE.NODE }) as Node[] ?? [])) {
-        const isZombie: boolean = (node.kind === NODE.KIND.ZOMBIE);
+        const isZombie: boolean = (node.state() === NODE.STATE.ZOMBIE);
         /* eslint-disable indent */
         const hasRelRef: boolean = (this.all({ payload: QUERY_TYPE.NODE }) as Node[] ?? []).some((relNode) => 
                                             (relNode.id !== node.id) 

@@ -399,12 +399,13 @@ describe('async mutex locking', () => {
       }
       // go
       const expdNode: Node = new Node('1',
-        NODE.KIND.DOC,
-        NODE.TYPE.DEFAULT, {
+        {
           uri: 'file://data/1',
           filename: 'one',
           title: 'One',
-        }
+        },
+        NODE.KIND.DOC,
+        NODE.TYPE.DEFAULT,
       );
       expdNode.attrs = {
         ['attrtype']: new Set(['2']) // <-- 👍

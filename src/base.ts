@@ -12,8 +12,8 @@ import type {
   QueryOpts,
 } from './types';
 import { NODE, QUERY_TYPE } from './const';
-import { Node } from './node';
-import { NodeStore } from './store';
+import { Node, NodeGraphCtx } from './node';
+import { DerivedIndex, NodeStore } from './store';
 
 
 export class Base {
@@ -114,6 +114,22 @@ export class Base {
     return configdNanoid();
   }
 
+  // the graph-attachment lookup bound to every node at creation, backing the
+  // no-arg 'node.phase()'. The attachment indexes are registered by the Phase
+  // layer (above tree+web); the closures evaluate LAZILY, so by call time they
+  // exist on the full composition. On a composition without the Phase layer,
+  // 'node.phase()' throws with a clear message.
+  public graphCtx(): NodeGraphCtx {
+    const lookup = (indexName: string) => (id: string): boolean => {
+      const idx = (this as any)[indexName] as DerivedIndex<Set<string>> | undefined;
+      if (idx === undefined) {
+        throw new Error(`node.state() requires the Phase composition ('${indexName}' not registered)`);
+      }
+      return idx.ensure(this.store).has(id);
+    };
+    return { inTree: lookup('treeAttachedIndex'), inWeb: lookup('webAttachedIndex') };
+  }
+
   // Generic "the node set changed" hook, fired on every base-level mutation.
   // Signals a node-kind change event through the store: stales all node-scoped
   // derived indexes (tree: parentIndex, web: backRefsIndex -- replacing the old
@@ -138,6 +154,7 @@ export class Base {
     return nodes.filter((node: Node) => {
       if (filter.nodeKind !== undefined && node.kind !== filter.nodeKind) { return false; }
       if (filter.nodeType !== undefined && node.type !== filter.nodeType) { return false; }
+      if (filter.nodeState !== undefined && node.state() !== filter.nodeState) { return false; }
       if (filter.filename !== undefined && node.data?.filename !== filter.filename) { return false; }
       return true;
     });
@@ -152,6 +169,7 @@ export class Base {
     if (payload === QUERY_TYPE.NODE) { return n; }
     if (payload === QUERY_TYPE.NODEKIND) { return n?.kind; }
     if (payload === QUERY_TYPE.NODETYPE) { return n?.type; }
+    if (payload === QUERY_TYPE.NODESTATE) { return n?.state(); }
     if (payload === QUERY_TYPE.DATA) { return n?.data; }
     if (payload === QUERY_TYPE.ZOMBIE) { return n?.data?.[this.zombieKey]; }
     const nData: Record<string, any> = n?.data ?? {};
@@ -187,7 +205,7 @@ export class Base {
 
   zombies(opts?: QueryOpts): string[] | Node[] | any[] | undefined {
     this.checkLock();
-    const mergedFilter = { ...opts?.filter, nodeKind: NODE.KIND.ZOMBIE as NODE.KIND };
+    const mergedFilter = { ...opts?.filter, nodeState: NODE.STATE.ZOMBIE };
     return this.all({ ...opts, filter: mergedFilter });
   }
 
@@ -222,7 +240,7 @@ export class Base {
     this.onMutate('flushGraph');
     for (const node of (this.all({ payload: QUERY_TYPE.NODE }) as Node[] ?? [])) {
       // delete zombies
-      if (node.kind === NODE.KIND.ZOMBIE) {
+      if (node.state() === NODE.STATE.ZOMBIE) {
         this.store.delete(node.id);
       // flush
       } else {
@@ -288,12 +306,7 @@ export class Base {
     if (typeof data === 'string') {
       const zombieData: any = {};
       zombieData[this.zombieKey] = data;
-      const zombieNode: Node = new Node(
-        this.genID(),
-        NODE.KIND.ZOMBIE,
-        undefined,
-        zombieData,
-      );
+      const zombieNode: Node = new Node(this.genID(), zombieData, undefined, undefined, this.graphCtx());
       this.store.put(zombieNode);
       this.store.indexKey(this.zombieKey, data, zombieNode.id);
       return { node: zombieNode };
@@ -314,7 +327,7 @@ export class Base {
     const kind: NODE.KIND = (init && init.kind) ? init.kind : NODE.KIND.DOC;
     const type: string    = (init && init.type) ? init.type : NODE.TYPE.DEFAULT;
     // init
-    const newNode: Node = new Node(id, kind, type, data);
+    const newNode: Node = new Node(id, data, kind, type, this.graphCtx());
     this.store.put(newNode);
     // populate 'uniqKeyMap'
     for (const key of Object.keys(data)) {
@@ -372,7 +385,7 @@ export class Base {
     node.data = data;
     node.kind = data.kind ? data.kind : NODE.KIND.DOC;
     node.type = data.type ? data.type : NODE.TYPE.DEFAULT;
-    return node;
+    return node;   // state flips live via the kind assignment above
   }
 
   // get
@@ -484,10 +497,10 @@ export class Base {
         }
       }
       const zombieData = node.data[this.zombieKey];
-      node.kind = NODE.KIND.ZOMBIE;
+      node.kind = undefined;   // kind-absence IS zombie-ness (state derives from it)
       node.type = undefined;
       node.data = { [this.zombieKey]: zombieData };
-      if ((node.kind === NODE.KIND.ZOMBIE) && this.get(id)?.data[this.zombieKey]) { return true; }
+      if ((node.state() === NODE.STATE.ZOMBIE) && this.get(id)?.data[this.zombieKey]) { return true; }
     }
     return false;
   }

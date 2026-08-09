@@ -111,6 +111,7 @@ export interface FilterOpts {
   type?: string;
   nodeKind?: NODE.KIND;
   nodeType?: string;
+  nodeState?: NODE.STATE;
 }
 
 export type PayloadOpt =

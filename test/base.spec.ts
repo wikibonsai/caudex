@@ -184,8 +184,8 @@ describe('base', () => {
         assert.ok(out.includes('1') && out.includes('2') && out.includes('4'));
       });
 
-      it('filter by nodeKind ZOMBIE', () => {
-        const out = base.all({ filter: { nodeKind: NODE.KIND.ZOMBIE } }) as string[];
+      it('filter by nodeState ZOMBIE', () => {
+        const out = base.all({ filter: { nodeState: NODE.STATE.ZOMBIE } }) as string[];
         assert.deepEqual(out, ['404']);
       });
 
@@ -364,7 +364,7 @@ describe('base', () => {
           assert.deepEqual(base.all({ filter: { nodeKind: NODE.KIND.DOC } }), ['1', '2']);
           base.add('zombie-filename');
           assert.deepEqual(base.all({ filter: { nodeKind: NODE.KIND.DOC } }), ['1', '2']);
-          assert.deepEqual(base.all({ filter: { nodeKind: NODE.KIND.ZOMBIE } }), ['404']);
+          assert.deepEqual(base.all({ filter: { nodeState: NODE.STATE.ZOMBIE } }), ['404']);
         });
 
         it('filter.nodeType returns only matching type', () => {
@@ -511,7 +511,7 @@ describe('base', () => {
           base.add('brains');
           const out = base.zombies({ payload: QUERY_TYPE.NODE }) as Node[];
           assert.strictEqual(out.length, 1);
-          assert.strictEqual(out[0].kind, NODE.KIND.ZOMBIE);
+          assert.strictEqual(out[0].state(), NODE.STATE.ZOMBIE);
         });
 
         it('zombies with payload filename', () => {
@@ -541,7 +541,7 @@ describe('base', () => {
         base.add('braaaains');
         assert.deepEqual(base.zombies({ payload: QUERY_TYPE.NODE }), [{
           id: '404',
-          kind: NODE.KIND.ZOMBIE,
+          kind: undefined,
           type: undefined,
           data: {
             filename: 'braaaains',
@@ -748,7 +748,7 @@ describe('base', () => {
 
         it('zombie case', () => {
           const zombieNode: Node | undefined = base.add('some-value');
-          if (!zombieNode || (zombieNode.kind !== NODE.KIND.ZOMBIE)) { assert.fail(); }
+          if (!zombieNode || (zombieNode.state() !== NODE.STATE.ZOMBIE)) { assert.fail(); }
           assert.strictEqual(zombieNode.data.filename, 'some-value');
           const success: boolean = base.edit(zombieNode.id, 'filename', 'some-edited-value');
           assert.strictEqual(success, true);
@@ -963,7 +963,7 @@ describe('base', () => {
           base.add('ten');
           assert.deepEqual(base.find('filename', 'ten'), {
             id: '404',
-            kind: NODE.KIND.ZOMBIE,
+            kind: undefined,
             type: undefined,
             data: {
               filename: 'ten',
@@ -1136,7 +1136,8 @@ describe('base', () => {
           assert.strictEqual(base.has('1'), true);
           const zombieNode: Node | undefined = base.get('1');
           if (zombieNode === undefined) { assert.fail(); }
-          assert.deepEqual(zombieNode.kind, NODE.KIND.ZOMBIE);
+          assert.deepEqual(zombieNode.kind, undefined);
+          assert.deepEqual(zombieNode.state(), NODE.STATE.ZOMBIE);
           assert.deepEqual(zombieNode.type, undefined);
           assert.deepEqual(Object.keys(zombieNode.data), ['filename']);
           if (!base.uniqKeyMap) {
@@ -1146,23 +1147,6 @@ describe('base', () => {
             assert.strictEqual(base.uniqKeyMap['filename']['one'], '1');
             assert.strictEqual(Object.keys(base.uniqKeyMap['uri']).includes('file://data/1/'), false);
           }
-        });
-
-        it('node exists; has relationships (backembeds); zombify', () => {
-          // before
-          const node: Node | undefined = base.get('2');
-          if (node === undefined) { assert.fail('test node should not be \'undefined\''); }
-          node.embeds = [{
-            id: '1',
-          }];
-          // go
-          assert.strictEqual(base.rm('1'), true);
-          // after: an embed is a reference like any other -- the node must
-          // zombify (keeping the embed target resolvable), not vanish outright
-          assert.strictEqual(base.has('1'), true);
-          const zombieNode: Node | undefined = base.get('1');
-          if (zombieNode === undefined) { assert.fail(); }
-          assert.deepEqual(zombieNode.kind, NODE.KIND.ZOMBIE);
         });
 
         it('node exists; has relationships (attributed); zombify', () => {
@@ -1176,7 +1160,8 @@ describe('base', () => {
           assert.strictEqual(base.has('1'), true);
           const zombieNode: Node | undefined = base.get('1');
           if (zombieNode === undefined) { assert.fail(); }
-          assert.deepEqual(zombieNode.kind, NODE.KIND.ZOMBIE);
+          assert.deepEqual(zombieNode.kind, undefined);
+          assert.deepEqual(zombieNode.state(), NODE.STATE.ZOMBIE);
           assert.deepEqual(zombieNode.type, undefined);
           assert.deepEqual(Object.keys(zombieNode.data), ['filename']);
           if (!base.uniqKeyMap) {
@@ -1202,7 +1187,8 @@ describe('base', () => {
           assert.strictEqual(base.has('1'), true);
           const zombieNode: Node | undefined = base.get('1');
           if (zombieNode === undefined) { assert.fail(); }
-          assert.deepEqual(zombieNode.kind, NODE.KIND.ZOMBIE);
+          assert.deepEqual(zombieNode.kind, undefined);
+          assert.deepEqual(zombieNode.state(), NODE.STATE.ZOMBIE);
           assert.deepEqual(zombieNode.type, undefined);
           assert.deepEqual(Object.keys(zombieNode.data), ['filename']);
           if (!base.uniqKeyMap) {
@@ -1212,6 +1198,23 @@ describe('base', () => {
             assert.strictEqual(base.uniqKeyMap['filename']['one'], '1');
             assert.strictEqual(Object.keys(base.uniqKeyMap['uri']).includes('file://data/1/'), false);
           }
+        });
+
+        it('node exists; has relationships (backembeds); zombify', () => {
+          // before
+          const node: Node | undefined = base.get('2');
+          if (node === undefined) { assert.fail('test node should not be \'undefined\''); }
+          node.embeds = [{
+            id: '1',
+          }];
+          // go
+          assert.strictEqual(base.rm('1'), true);
+          // after: an embed is a reference like any other -- the node must
+          // zombify (keeping the embed target resolvable), not vanish outright
+          assert.strictEqual(base.has('1'), true);
+          const zombieNode: Node | undefined = base.get('1');
+          if (zombieNode === undefined) { assert.fail(); }
+          assert.deepEqual(zombieNode.state(), NODE.STATE.ZOMBIE);
         });
 
         it('node does not exist', () => {

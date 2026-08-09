@@ -8,7 +8,7 @@ import { Node, NODE } from '../src/index';
 let store: NodeStore;
 
 const buildNode = (id: string, data: any = {}): Node =>
-  new Node(id, NODE.KIND.DOC, NODE.TYPE.DEFAULT, data);
+  new Node(id, data, NODE.KIND.DOC, NODE.TYPE.DEFAULT);
 
 describe('store (StoragePort)', () => {
 

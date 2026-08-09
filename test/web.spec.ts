@@ -123,24 +123,9 @@ describe('web', () => {
 
     });
 
-    describe('isolates', () => {
-
-      it('index has isolates', () => {
-        assert.deepEqual(wiki.isolates(), ['1', '2', '3', '4']);
-      });
-
-      it('index has no isolates', () => {
-        wiki.connect('1', '2', EDGE.KIND.LINK, 'link');
-        wiki.connect('1', '3', EDGE.KIND.LINK, 'link');
-        wiki.connect('1', '4', EDGE.KIND.LINK, 'link');
-        assert.deepEqual(wiki.isolates(), []);
-      });
-
-      it('with query', () => {
-        assert.deepEqual(wiki.isolates({ payload: 'filename' }), ['one', 'two', 'three', 'four']);
-      });
-
-    });
+    // note: 'isolates' moved to the Phase layer (phase.ts) with the 2x2 phase
+    // semantics (degree-0 across BOTH axes) -- see state.spec.ts. Web(Base)
+    // compositions no longer have it.
 
     describe('foreattrs / backattrs', () => {
 
@@ -480,9 +465,9 @@ describe('web', () => {
         wiki.index['1'].embeds.push({
           id: '4',
         });
-        // assert.deepEqual(wiki.neighbors('1', EDGE.KIND.EMBED), ['4']);
-        // assert.deepEqual(wiki.neighbors('2', EDGE.KIND.EMBED), []);
-        // assert.deepEqual(wiki.neighbors('3', EDGE.KIND.EMBED), []);
+        // assert.deepEqual(wiki.neighbors('1', REL.REF.EMBED), ['4']);
+        // assert.deepEqual(wiki.neighbors('2', REL.REF.EMBED), []);
+        // assert.deepEqual(wiki.neighbors('3', REL.REF.EMBED), []);
         assert.deepEqual(wiki.neighbors('4', EDGE.KIND.EMBED), ['1']);
       });
 
@@ -517,13 +502,6 @@ describe('web', () => {
           wiki.index['1'].links.push({ type: 't', id: '3' });
           assert.deepEqual(wiki.neighbors('1', { filter: { kind: EDGE.KIND.ATTR } }), ['2']);
           assert.deepEqual(wiki.neighbors('1', { filter: { kind: EDGE.KIND.LINK } }), ['3']);
-        });
-
-        it('isolates with filter: filter not applied to isolate set; full list returned', () => {
-          // isolates() does not pass filter to all(); which nodes are isolates is unchanged by filter.
-          const noFilter = wiki.isolates();
-          const withFilter = wiki.isolates({ filter: { filename: 'one' } });
-          assert.deepEqual(withFilter, noFilter, 'filter does not restrict which nodes are isolates');
         });
 
         it('neighbors with filter (non-kind): only filter.kind is used; other filter fields ignored', () => {
@@ -577,12 +555,6 @@ describe('web', () => {
         it('foreembeds with payload id (default)', () => {
           wiki.connect('1', '2', { kind: EDGE.KIND.EMBED });
           assert.deepEqual(wiki.foreembeds('1'), [{ id: '2' }]);
-        });
-
-        it('isolates with payload node', () => {
-          const out = wiki.isolates({ payload: QUERY_TYPE.NODE }) as Node[];
-          assert.strictEqual(out.length, 4);
-          assert.strictEqual(out[0].id, '1');
         });
 
       });
@@ -763,21 +735,6 @@ describe('web', () => {
         });
       });
 
-      describe('isolates payload', () => {
-        it('isolates payload node', () => {
-          const out = wiki.isolates({ payload: QUERY_TYPE.NODE }) as Node[];
-          assert.strictEqual(out.length, 4);
-          assert.strictEqual(out[0].id, '1');
-        });
-
-        it('isolates payload data', () => {
-          const out = wiki.isolates({ payload: QUERY_TYPE.DATA }) as any[];
-          assert.strictEqual(out.length, 4);
-          assert.ok(out[0].uri && out[0].filename);
-        });
-
-      });
-
     });
 
   });
@@ -906,7 +863,7 @@ describe('web', () => {
         assert.deepEqual(wiki.zombies().length, 1);
         assert.deepEqual(wiki.zombies({ payload: QUERY_TYPE.NODE }), [{
           id: '404',
-          kind: NODE.KIND.ZOMBIE,
+          kind: undefined,
           type: undefined,
           data: {
             filename: 'ima-zombie 🧟',
@@ -954,7 +911,7 @@ describe('web', () => {
         assert.deepEqual(wiki.zombies().length, 1);
         assert.deepEqual(wiki.zombies({ payload: QUERY_TYPE.NODE }), [{
           id: '404',
-          kind: NODE.KIND.ZOMBIE,
+          kind: undefined,
           type: undefined,
           data: {
             filename: 'ima-zombie 🧟',
@@ -1144,8 +1101,8 @@ describe('web', () => {
 
     describe('connect(); embed', () => {
 
-      it('media kinds; media-absence = doc-embed, real kinds validate, junk rejected', () => {
-        // doc-embed: no media arg -> media-absent embed
+      it('media kinds; media-absence = note-embed, real kinds validate, junk rejected', () => {
+        // note-embed: no media arg -> media-absent embed
         assert.strictEqual(wiki.connect('1', '2', EDGE.KIND.EMBED), true);
         assert.deepEqual(wiki.index['1'].embeds, [{ id: '2' }]);
         // media-embed: explicit real kind

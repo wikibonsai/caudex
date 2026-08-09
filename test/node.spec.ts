@@ -10,12 +10,13 @@ describe('node', () => {
 
   beforeEach(() => {
     node = new Node('1',
-      NODE.KIND.DOC,
-      'node-type', {
+      {
         uri: 'file://data/1',
         filename: 'one',
         title: 'One',
-      }
+      },
+      NODE.KIND.DOC,
+      'node-type',
     );
     node.children = ['2'];
     node.attrs = {
@@ -32,17 +33,28 @@ describe('node', () => {
 
   describe('properties', () => {
 
-    it('expected properties', () => {
+    it('expected properties (state is DERIVED -- no stored field)', () => {
       assert.deepStrictEqual(Object.getOwnPropertyNames(node), [
         'id',
+        'data',
         'kind',
         'type',
-        'data',
         'children',
         'attrs',
         'links',
         'embeds',
       ]);
+    });
+
+    it('state(); live when constructed with a kind, zombie without', () => {
+      assert.strictEqual(node.state(), NODE.STATE.LIVE);
+      const zombie: Node = new Node('z', { filename: 'zzz' });
+      assert.strictEqual(zombie.state(), NODE.STATE.ZOMBIE);
+      assert.strictEqual(zombie.kind, undefined);
+    });
+
+    it('phase(); throws without a bound graph context (state() works standalone)', () => {
+      assert.throws(() => node.phase(), /requires a graph-bound node/);
     });
 
     it('id', () => {

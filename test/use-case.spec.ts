@@ -107,13 +107,15 @@ describe('use-case', () => {
       assert.strictEqual(wb.find('uri', 'file://data/5')?.id, '5');
     });
 
-    it('a newly created file starts with no relationships (orphan + isolate)', () => {
+    it('a newly created file starts with no relationships (an isolate)', () => {
       wb.add(newFileData, { id: '5' });
       // not yet placed in the semtree...
       assert.strictEqual(wb.parent('5'), '');
       assert.deepEqual(wb.children('5'), []);
       // ...and not yet referenced anywhere in the web
       assert.deepEqual(wb.neighbors('5'), []);
+      // -> connected to nothing on either axis
+      assert.strictEqual(wb.get('5').phase(), NODE.PHASE.ISOLATE);
     });
 
     it('rejects a duplicate file (unique key collision)', () => {
@@ -200,12 +202,12 @@ describe('use-case', () => {
   //
   // removing a doc from the index === prune from its parent. the file still
   // exists (still a doc node in the caudex) -- it just loses its tree position
-  // and becomes an orphan (see "orphans, isolates & zombies" below).
+  // (see "the phase 2x2" below for where it lands).
   // ---------------------------------------------------------------------------
 
   describe('prune a file from semtree', () => {
 
-    it('removes a leaf doc from the index; the file remains as an orphan', () => {
+    it('removes a leaf doc from the index; the unreferenced file becomes an isolate', () => {
       // user deletes the `- [[four]]` bullet from `two`'s index, but keeps four.md
       assert.strictEqual(wb.prune('2', '4'), true);
       // still a real doc in the caudex...
@@ -214,8 +216,8 @@ describe('use-case', () => {
       // ...but no longer positioned in the tree
       assert.strictEqual(wb.parent('4'), '');
       assert.deepEqual(wb.children('2'), []);
-      // which makes it an orphan (a doc connected to no index)
-      assert.ok((wb.orphans(wb.all() as string[]) as string[]).includes('4'));
+      // nothing references it in the web either -> connected to nothing at all
+      assert.strictEqual(wb.get('4').phase(), NODE.PHASE.ISOLATE);
     });
 
     it('refuses to prune a non-leaf without force (would strand its subtree)', () => {
@@ -542,18 +544,18 @@ describe('use-case', () => {
   });
 
   // ===========================================================================
-  // orphans, isolates & zombies -- three ORTHOGONAL states
+  // state & phase (TERMS.md)
   //
-  // these describe three independent axes; a node can be any combination of them:
-  //   - orphan   (TREE axis):  a node not connected in the semtree. it may still
-  //              have web links to/from other nodes -- it just isn't in an index.
-  //   - isolate  (WEB axis):   a node with no references to or from it. it may
-  //              still sit in the semtree -- it just has no wikirefs/attrs/embeds.
-  //   - zombie   (FILE axis):  a referenced target with no backing file. caudex
-  //              excludes zombies from BOTH orphans() and isolates().
+  //   state -- whether the document EXISTS: zombie -> live. a dangling
+  //     `[[link]]` is a zombie; zombies are gated out of the phase cells entirely.
+  //   phase -- tree x web attachment, one EXCLUSIVE cell per live doc:
   //
-  // a brand-new, unplaced, unreferenced file is both an orphan AND an isolate.
-  // a dangling `[[link]]` is a zombie (and neither an orphan nor an isolate).
+  //                    in web        not in web
+  //     in tree      integrated     wallflower
+  //     not in tree    orphan         isolate
+  //
+  // a brand-new, unplaced, unreferenced file is an isolate; graft it and it's a
+  // wallflower; link it instead and it's an orphan; do both and it's integrated.
   // ===========================================================================
 
   describe('create a dangling link (zombie)', () => {
@@ -562,7 +564,7 @@ describe('use-case', () => {
       // user types `[[ghost]]` in `one.md` but `ghost.md` does not exist
       const zombie: Node | undefined = wb.add('ghost');
       if (!zombie) { assert.fail('expected a zombie node'); }
-      assert.strictEqual(zombie.kind, NODE.KIND.ZOMBIE);
+      assert.strictEqual(zombie.state(), NODE.STATE.ZOMBIE);
       wb.connect('1', zombie.id, EDGE.KIND.LINK, 'linktype');
       // the zombie is tracked and carries the backref
       assert.deepEqual(wb.zombies(), [zombie.id]);
@@ -620,7 +622,7 @@ describe('use-case', () => {
       assert.strictEqual(wb.rm('2'), true);
       // the node survives as a zombie so the backlink is not orphaned
       assert.strictEqual(wb.has('2'), true);
-      assert.strictEqual(wb.get('2')?.kind, NODE.KIND.ZOMBIE);
+      assert.strictEqual(wb.get('2')?.state(), NODE.STATE.ZOMBIE);
       assert.deepEqual(wb.backlinks('2'), [{ type: 'linktype', id: '1' }] as Links);
     });
 
@@ -666,23 +668,40 @@ describe('use-case', () => {
   // inspect the garden (health checks)
   //
   // the diagnostics a PKM surfaces to the user (cf. tendr-cli `list` / `check` /
-  // `status`): docs missing from every index (orphans), docs with no references
-  // (isolates), and dangling links (zombies).
+  // `status`): the phase cells (orphans / wallflowers / isolates /
+  // integrated) and dangling links (zombies).
   // ---------------------------------------------------------------------------
 
   describe('inspect the garden', () => {
 
-    it('lists orphans -- docs that exist but sit in no index', () => {
-      // `five` is created but never grafted into the semtree
+    it('lists orphans -- docs in the web but in no index', () => {
+      // `five` is created and linked-to, but never grafted into the semtree
       wb.add(newFileData, { id: '5' });
-      const treeIDs = ['1', '2', '3', '4', '5'];
-      assert.deepEqual(wb.orphans(treeIDs), ['5']);
+      wb.connect('1', '5', EDGE.KIND.LINK, 'linktype');
+      assert.deepEqual(wb.orphans(), ['5']);
     });
 
-    it('lists isolates -- docs with no references at all', () => {
-      // link `one` -> `two`; the rest remain unreferenced in the web
+    it('lists isolates -- docs connected to nothing at all', () => {
+      // drop `four` from the index; nothing references it in the web either
+      wb.prune('2', '4');
+      assert.deepEqual(wb.isolates(), ['4']);
+    });
+
+    it('lists wallflowers -- docs in the tree but unreferenced in the web', () => {
+      // link `one` -> `two`; `three`/`four` stay tree-placed with no web refs
       wb.connect('1', '2', EDGE.KIND.LINK, 'linktype');
-      assert.deepEqual(wb.isolates(), ['3', '4']);
+      assert.deepEqual(wb.wallflowers(), ['3', '4']);
+    });
+
+    it('phases() -- the whole 2x2 at once', () => {
+      wb.prune('2', '4');                               // 4: nothing at all
+      wb.connect('1', '2', EDGE.KIND.LINK, 'linktype');   // 1, 2: tree + web
+      assert.deepEqual(wb.phases(), {
+        [NODE.PHASE.ISOLATE]: ['4'],
+        [NODE.PHASE.ORPHAN]: [],
+        [NODE.PHASE.WALLFLOWER]: ['3'],
+        [NODE.PHASE.INTEGRATED]: ['1', '2'],
+      });
     });
 
     it('lists zombies -- dangling links to files that do not exist', () => {
@@ -694,47 +713,46 @@ describe('use-case', () => {
 
   });
 
-  // the three states are independent -- these cases pin down that orthogonality
-  // so the definitions above can't silently drift back into being conflated.
-  describe('orphan / isolate / zombie are orthogonal', () => {
+  // the cells are exclusive -- these cases pin down the 2x2 so the definitions
+  // above can't silently drift back into being conflated.
+  describe('the phase 2x2', () => {
 
-    it('orphan but NOT isolate: dropped from the index, yet still web-linked', () => {
+    it('orphan: dropped from the index, yet still web-linked', () => {
       // prune `four` out of the index, but `one` still links to it
       wb.prune('2', '4');
       wb.connect('1', '4', EDGE.KIND.LINK, 'linktype');
-      const ids = wb.all() as string[];
-      // TREE axis: not in any index -> orphan
-      assert.ok((wb.orphans(ids) as string[]).includes('4'));
-      // WEB axis: it has a backlink -> NOT an isolate
+      assert.strictEqual(wb.get('4').phase(), NODE.PHASE.ORPHAN);
+      assert.ok((wb.orphans() as string[]).includes('4'));
       assert.ok(!(wb.isolates() as string[]).includes('4'));
     });
 
-    it('isolate but NOT orphan: in the index, yet referenced by nothing', () => {
+    it('wallflower: in the index, yet referenced by nothing', () => {
       // give the other nodes web refs; `four` stays a tree leaf with no refs
       wb.connect('1', '2', EDGE.KIND.LINK, 'linktype');
       wb.connect('3', '1', EDGE.KIND.LINK, 'linktype');
-      const ids = wb.all() as string[];
-      // WEB axis: no refs to or from it -> isolate
-      assert.ok((wb.isolates() as string[]).includes('4'));
-      // TREE axis: still a child of `two` -> NOT an orphan
-      assert.ok(!(wb.orphans(ids) as string[]).includes('4'));
+      assert.strictEqual(wb.get('4').phase(), NODE.PHASE.WALLFLOWER);
+      assert.ok((wb.wallflowers() as string[]).includes('4'));
+      assert.ok(!(wb.isolates() as string[]).includes('4'));
+      assert.ok(!(wb.orphans() as string[]).includes('4'));
     });
 
-    it('both orphan AND isolate: a brand-new, unplaced, unreferenced file', () => {
+    it('isolate: a brand-new, unplaced, unreferenced file (one cell, not two)', () => {
       wb.add(newFileData, { id: '5' });
-      const ids = wb.all() as string[];
-      assert.ok((wb.orphans(ids) as string[]).includes('5'));
+      assert.strictEqual(wb.get('5').phase(), NODE.PHASE.ISOLATE);
       assert.ok((wb.isolates() as string[]).includes('5'));
+      assert.ok(!(wb.orphans() as string[]).includes('5'));
     });
 
-    it('zombie: counted as NEITHER an orphan nor an isolate', () => {
+    it('zombie: gated out of every cell by state', () => {
       const zombie: Node | undefined = wb.add('ghost');
       if (!zombie) { assert.fail('expected a zombie node'); }
       wb.connect('1', zombie.id, EDGE.KIND.LINK, 'linktype');
-      const ids = wb.all() as string[];
       assert.deepEqual(wb.zombies(), [zombie.id]);
-      // caudex excludes zombies from both reckonings (file-existence is its own axis)
-      assert.ok(!(wb.orphans(ids) as string[]).includes(zombie.id));
+      // state and phase report truthfully (the referenced zombie IS web-attached)...
+      assert.strictEqual(wb.get(zombie.id).state(), NODE.STATE.ZOMBIE);
+      assert.strictEqual(wb.get(zombie.id).phase(), NODE.PHASE.ORPHAN);
+      // ...but the bulk queries gate by state: health counts live docs only
+      assert.ok(!(wb.orphans() as string[]).includes(zombie.id));
       assert.ok(!(wb.isolates() as string[]).includes(zombie.id));
     });
 

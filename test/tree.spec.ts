@@ -161,43 +161,8 @@ describe('tree', () => {
 
   describe('properties', () => {
 
-    describe('orphans', () => {
-
-      it('index has orphans', () => {
-        assert.deepEqual(bonsai.orphans(bonsai.all()), ['5']);
-      });
-
-      it('index has no orphans', () => {
-        bonsai.rm('5');
-        assert.deepEqual(bonsai.orphans(bonsai.all()), []);
-      });
-
-      it('treeIDs optional; defaults to the whole index', () => {
-        assert.deepEqual(bonsai.orphans(), ['5']);
-      });
-
-      it('treeIDs optional; with query opts', () => {
-        assert.deepEqual(bonsai.orphans(undefined, { payload: QUERY_TYPE.NODEKIND }), [NODE.KIND.DOC]);
-      });
-
-      it('with query', () => {
-        assert.deepEqual(bonsai.orphans(bonsai.all(), { payload: QUERY_TYPE.NODE }), [{
-          id: '5',
-          kind: NODE.KIND.DOC,
-          type: NODE.TYPE.DEFAULT,
-          data: {
-            uri: 'file://data/5',
-            filename: 'five',
-            title: 'Five',
-          },
-          attrs: {},
-          children: [],
-          links: [],
-          embeds: [],
-        }]);
-      });
-
-    });
+    // note: 'orphans' moved to the Phase layer (phase.ts) with the 2x2 phase
+    // semantics -- see state.spec.ts. Tree(Base) compositions no longer have it.
 
     describe('ancestors', () => {
 
@@ -505,12 +470,6 @@ describe('tree', () => {
           assert.strictEqual(typeof withFilter === 'object' ? (withFilter as Node).id : withFilter, '1', 'filter ignored; same root');
         });
 
-        it('orphans with filter: relation list is not filtered; full orphan list returned', () => {
-          assert.deepEqual(bonsai.orphans(bonsai.all()), ['5']);
-          const withFilter = bonsai.orphans(bonsai.all(), { filter: { filename: 'five' } });
-          assert.deepEqual(withFilter, ['5'], 'filter does not restrict which nodes are orphans');
-        });
-
         it('parent with filter: filter is ignored; same parent returned', () => {
           assert.strictEqual(bonsai.parent('2'), '1');
           assert.strictEqual(bonsai.parent('2', { filter: { nodeType: NODE.TYPE.ENTRY } }), '1', 'filter ignored');
@@ -638,13 +597,6 @@ describe('tree', () => {
           const out = bonsai.lineage('3', { payload: QUERY_TYPE.NODE }) as Node[];
           assert.ok(out.length >= 2);
           assert.ok(out.some((n: Node) => n.id === '1') && out.some((n: Node) => n.id === '2'));
-        });
-
-        it('orphans payload node', () => {
-          const allIds = bonsai.all({ payload: QUERY_TYPE.ID }) as string[];
-          const out = bonsai.orphans(allIds, { payload: QUERY_TYPE.NODE }) as Node[];
-          assert.ok(Array.isArray(out));
-          assert.ok(out.every((n: Node) => n && n.id));
         });
 
       });
@@ -842,13 +794,11 @@ describe('tree', () => {
          *  3   4
          */
           // setup
-          const treeIDs: string[] = ['1', '2', '3', '4', '5'];
           const testSourceNode: Node | undefined = bonsai.get('2'); // mid-node
-          const testTargetNode: Node | undefined = bonsai.get('5'); // orphan
+          const testTargetNode: Node | undefined = bonsai.get('5'); // unattached
           // pretest
           if (!testSourceNode) { assert.fail(); }
           if (!testTargetNode) { assert.fail(); }
-          assert.deepEqual(bonsai.orphans(treeIDs), ['5']);
           assert.deepEqual(bonsai.parent(testTargetNode.id), '');
           assert.deepEqual(testTargetNode.children, []);
           assert.deepEqual(bonsai.parent(testSourceNode.id), '1');
@@ -858,7 +808,6 @@ describe('tree', () => {
           // test
           const replacedNode: Node | undefined = bonsai.get('5');
           if (!replacedNode) { assert.fail(); }
-          assert.deepEqual(bonsai.orphans(treeIDs), ['2']);
           assert.deepEqual(testSourceNode.children, []);
           assert.deepEqual(bonsai.parent(testSourceNode.id), '');
           assert.deepEqual(bonsai.parent(replacedNode.id), '1');

@@ -60,18 +60,12 @@ export function Web<TBase extends Mixin>(Base: TBase) {
 
     // properties
 
-    // nodes that are not linked to any other node in the web
-    isolates(opts?: QueryOpts): string[] | Node[] | any[] | undefined {
-      this.checkLock();
-      const payload = opts?.payload ?? QUERY_TYPE.ID;
-      /* eslint-disable indent */
-      return (this.all({ payload: QUERY_TYPE.NODE }) as Node[] ?? [])
-                 .filter((node: Node) =>
-                   (this.neighbors(node.id, opts)?.length === 0) &&
-                   (node.kind !== NODE.KIND.ZOMBIE))
-                 .map((node: Node) => this.get(node.id, { ...opts, payload }));
-      /* eslint-enable indent */
-    }
+    // note: the phase bulk queries (phases/integrated/orphans/wallflowers/
+    // isolates) live in phase.ts, and per-node phase on the node itself
+    // ('node.phase()') -- phase partitions nodes across BOTH the tree and web
+    // attachment axes. (the old web-only 'isolates()' -- "no web neighbors" --
+    // was the single-axis meaning the TERMS reorg retired; the new isolate is
+    // degree-0 across both axes.)
 
     // web-lvl
 
@@ -348,7 +342,7 @@ export function Web<TBase extends Mixin>(Base: TBase) {
         for (const relRefID of relRefIDs) {
           const relRefNode: Node | undefined = this.get(relRefID, { payload: QUERY_TYPE.NODE });
           if (!relRefNode) { continue; }
-          const isZombie: boolean = (relRefNode.kind === NODE.KIND.ZOMBIE);
+          const isZombie: boolean = (relRefNode.state() === NODE.STATE.ZOMBIE);
           const hasRel: boolean = (this.all({ payload: QUERY_TYPE.NODE }) as Node[] ?? []).some((n) =>
             (n.id !== relRefID && n.inChildren(relRefID))
             || (n.id !== relRefID && n.id !== id && (n.inAttrs(relRefID) || n.inLinks(relRefID) || n.inEmbeds(relRefID)))
@@ -365,7 +359,7 @@ export function Web<TBase extends Mixin>(Base: TBase) {
       // all
       } else {
         for (const node of (this.all({ payload: QUERY_TYPE.NODE }) as Node[] ?? [])) {
-          const isZombie: boolean = (node.kind === NODE.KIND.ZOMBIE);
+          const isZombie: boolean = (node.state() === NODE.STATE.ZOMBIE);
           const hasFamRel: boolean = (this.all({ payload: QUERY_TYPE.NODE }) as Node[] ?? []).some((relNode) =>
             (relNode.id !== node.id) && (relNode.inChildren(node.id))
           );
@@ -388,13 +382,13 @@ export function Web<TBase extends Mixin>(Base: TBase) {
         ? {
           kind: optsOrKind,
           type: optsOrKind === EDGE.KIND.EMBED ? undefined : (typeOrMedia ?? ''),
-          // media stays undefined for doc-embeds (markdown is not a media kind)
+          // media stays undefined for note-embeds (markdown is not a media kind)
           media: optsOrKind === EDGE.KIND.EMBED ? (typeOrMedia as NODE.MEDIA | undefined) : undefined,
         }
         : optsOrKind as ConnectOpts;
       const { kind, type = '', header, media, position } = opts;
       if (kind === EDGE.KIND.REF) {
-        console.warn('please connect to a more specific relationship(\'EDGE.KIND.ATTR\', \'EDGE.KIND.LINK\', or \'EDGE.KIND.EMBED\'');
+        console.warn('please connect to a more specific relationship(\'REL.REF.ATTR\', \'REL.REF.LINK\', or \'REL.REF.EMBED\'');
         return false;
       }
       if (kind === EDGE.KIND.ATTR && header !== undefined) {
@@ -436,7 +430,7 @@ export function Web<TBase extends Mixin>(Base: TBase) {
         return true;
       }
       if (kind === EDGE.KIND.EMBED) {
-        // media-absence = doc-embed; a given media must be a real media kind
+        // media-absence = note-embed; a given media must be a real media kind
         if ((media !== undefined) && !Object.values(NODE.MEDIA).includes(media)) {
           console.warn('invalid media kind: ' + media);
           return false;
@@ -464,13 +458,13 @@ export function Web<TBase extends Mixin>(Base: TBase) {
         ? {
           kind: optsOrKind,
           type: optsOrKind === EDGE.KIND.EMBED ? undefined : (typeOrMedia ?? ''),
-          // media stays undefined for doc-embeds (markdown is not a media kind)
+          // media stays undefined for note-embeds (markdown is not a media kind)
           media: optsOrKind === EDGE.KIND.EMBED ? (typeOrMedia as NODE.MEDIA | undefined) : undefined,
         }
         : optsOrKind as DisconnectOpts;
       const { kind, type = '', header, media, position } = opts;
       if (kind === EDGE.KIND.REF) {
-        console.warn('please disconnect a more specific relationship(\'EDGE.KIND.ATTR\', \'EDGE.KIND.LINK\', or \'EDGE.KIND.EMBED\'');
+        console.warn('please disconnect a more specific relationship(\'REL.REF.ATTR\', \'REL.REF.LINK\', or \'REL.REF.EMBED\'');
         return false;
       }
       this.checkLock();
