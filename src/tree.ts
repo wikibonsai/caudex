@@ -1,6 +1,7 @@
 import type { Mixin, QueryOpts } from './types';
 import { DATA_STRUCT, NODE, QUERY_TYPE } from './const';
 import { Node } from './node';
+import { DerivedIndex, StoragePort } from './store';
 
 
 export function Tree<TBase extends Mixin>(Base: TBase) {
@@ -10,35 +11,37 @@ export function Tree<TBase extends Mixin>(Base: TBase) {
     // parent index — 'childId -> parentId', a derived cache over the tree's child
     // pointers so parent()/ancestors()/inTree() are O(1)/O(depth) instead of a full
     // tree walk per call (the graph-lineage + ancestor derives that the app's
-    // caudexRevision storm hammers). Mirrors web's backRefsIndex: lazy, rebuilt when
-    // dirty, invalidated on any mutation. Field-initialized (Tree has no constructor).
-    public parentIndex: Map<string, string> = new Map();
-    public parentIndexDirty: boolean = true;
+    // caudexRevision storm hammers). Registered against the store, so base-level
+    // mutations invalidate it via the 'invalidateIndexes' sweep (no onMutate
+    // override needed); tree-only mutations (graft/prune/replace) invalidate it
+    // directly. The projector rebuilds from a single scan: every node's children
+    // point back to it. Field-initialized (Tree has no constructor).
+    public parentIndex: DerivedIndex<Map<string, string>> = this.store.defineIndex(
+      'parentIndex',
+      (store: StoragePort): Map<string, string> => {
+        const idx: Map<string, string> = new Map();
+        for (const node of store.all()) {
+          for (const childID of node.children) { idx.set(childID, node.id); }
+        }
+        return idx;
+      },
+    );
+
+    public get parentIndexDirty(): boolean {
+      return this.parentIndex.dirty;
+    }
 
     public invalidateParentIndex(): void {
-      this.parentIndexDirty = true;
+      this.parentIndex.invalidate();
     }
 
-    // rebuild from a single scan: every node's children point back to it.
     public rebuildParentIndex(): void {
-      const idx: Map<string, string> = new Map();
-      for (const node of Object.values(this.index)) {
-        for (const childID of node.children) { idx.set(childID, node.id); }
-      }
-      this.parentIndex = idx;
-      this.parentIndexDirty = false;
+      this.parentIndex.rebuild(this.store);
     }
 
-    public ensureParentIndex(): void {
-      if (this.parentIndexDirty) { this.rebuildParentIndex(); }
-    }
-
-    // tree relations change on graft/prune/setRoot/replace AND on base-level node
-    // add/rm/clear (a removed parent strands its children), so hook base's onMutate;
-    // chain super so web's backRefsIndex invalidation still runs.
-    public onMutate(): void {
-      super.onMutate();
-      this.invalidateParentIndex();
+    public ensureParentIndex(): Map<string, string> {
+      if (this.parentIndex.dirty) { this.rebuildParentIndex(); }
+      return this.parentIndex.value as Map<string, string>;
     }
 
     // root operations
@@ -107,8 +110,7 @@ export function Tree<TBase extends Mixin>(Base: TBase) {
       this.checkLock();
       if (!this.has(id)) { return undefined; }
       // O(1) lookup via the parent index (was: getRelFam → full-tree search()).
-      this.ensureParentIndex();
-      const parentID: string | undefined = this.parentIndex.get(id);
+      const parentID: string | undefined = this.ensureParentIndex().get(id);
       if (parentID === undefined) { return ''; }
       const payload = opts?.payload ?? QUERY_TYPE.ID;
       return (payload === QUERY_TYPE.ID || payload === undefined) ? parentID : this.get(parentID, { ...opts, payload });
@@ -118,8 +120,7 @@ export function Tree<TBase extends Mixin>(Base: TBase) {
       this.checkLock();
       if (!this.has(id)) { return undefined; }
       // the parent's other children (parent via the index; [] if id is the root).
-      this.ensureParentIndex();
-      const parentID: string | undefined = this.parentIndex.get(id);
+      const parentID: string | undefined = this.ensureParentIndex().get(id);
       const parentNode: Node | undefined = parentID !== undefined
         ? this.get(parentID, { payload: QUERY_TYPE.NODE })
         : undefined;
@@ -181,14 +182,14 @@ export function Tree<TBase extends Mixin>(Base: TBase) {
     // lineage(). O(depth).
     public walkUp(id: string): string[] {
       this.checkLock();
-      this.ensureParentIndex();
+      const parentIndex: Map<string, string> = this.ensureParentIndex();
       const ids: string[] = [];
       const seen: Set<string> = new Set();   // defensive cycle guard
-      let cur: string | undefined = this.parentIndex.get(id);
+      let cur: string | undefined = parentIndex.get(id);
       while (cur !== undefined && !seen.has(cur)) {
         ids.unshift(cur);
         seen.add(cur);
-        cur = this.parentIndex.get(cur);
+        cur = parentIndex.get(cur);
       }
       return ids;
     }
@@ -501,8 +502,7 @@ export function Tree<TBase extends Mixin>(Base: TBase) {
       this.checkLock();
       // "in the tree" == has a parent (matches the old full-scan for a node whose
       // children include id; the root has no parent and was false there too). O(1).
-      this.ensureParentIndex();
-      return this.parentIndex.has(id);
+      return this.ensureParentIndex().has(id);
     }
 
     public isRoot(id: string): boolean {
@@ -548,14 +548,14 @@ export function Tree<TBase extends Mixin>(Base: TBase) {
     // pointers on the node (get().children) but reads empty through children()/
     // descendants()/lineage() until it is re-grafted. O(depth), short-circuits at root.
     public isRooted(id: string): boolean {
-      this.ensureParentIndex();
+      const parentIndex: Map<string, string> = this.ensureParentIndex();
       if (id === this._root) { return true; }
       const seen: Set<string> = new Set();   // defensive cycle guard
-      let cur: string | undefined = this.parentIndex.get(id);
+      let cur: string | undefined = parentIndex.get(id);
       while (cur !== undefined && !seen.has(cur)) {
         if (cur === this._root) { return true; }
         seen.add(cur);
-        cur = this.parentIndex.get(cur);
+        cur = parentIndex.get(cur);
       }
       return false;
     }

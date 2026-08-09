@@ -17,6 +17,55 @@ export interface StoragePort {
   indexKey(key: string, value: any, id: string): void;
   deindexKey(key: string, value: any): void;
   serialize(): string;
+  defineIndex<T>(name: string, projector: (store: StoragePort) => T): DerivedIndex<T>;
+  invalidateIndexes(): void;
+}
+
+// a lazily-(re)built cache derived from the node store. Each instance supplies
+// only its unique part -- the 'projector', a pure function '(store) -> cache' --
+// while the dirty / rebuild / ensure lifecycle (previously copy-pasted per index
+// across the tree + web mixins) lives here once. Registered via
+// 'store.defineIndex()' so a store-level mutation signal ('invalidateIndexes')
+// sweeps every index without each one hooking the mutation path itself.
+export class DerivedIndex<T> {
+  public readonly name: string;
+  #projector: (store: StoragePort) => T;
+  #value: T | undefined;
+  #dirty: boolean = true;
+
+  constructor(name: string, projector: (store: StoragePort) => T) {
+    this.name = name;
+    this.#projector = projector;
+  }
+
+  public get dirty(): boolean {
+    return this.#dirty;
+  }
+
+  // the current projection ('undefined' until first built); does NOT rebuild --
+  // callers wanting freshness go through 'ensure()'.
+  public get value(): T | undefined {
+    return this.#value;
+  }
+
+  public invalidate(): void {
+    this.#dirty = true;
+  }
+
+  // re-project unconditionally.
+  public rebuild(store: StoragePort): T {
+    this.#value = this.#projector(store);
+    this.#dirty = false;
+    return this.#value;
+  }
+
+  // re-project only if stale, then serve.
+  public ensure(store: StoragePort): T {
+    if (this.#dirty || this.#value === undefined) {
+      return this.rebuild(store);
+    }
+    return this.#value;
+  }
 }
 
 // the in-memory StoragePort: the node store + unique-key lookup extracted from
@@ -32,6 +81,7 @@ export interface StoragePort {
 export class NodeStore implements StoragePort {
   #nodes: Record<string, Node> = {};
   #uniqKeyMap: Record<string, Record<string, string>> | undefined;
+  #indexes: DerivedIndex<any>[] = [];
   public readonly uniqKeys: string[];
 
   constructor(uniqKeys?: string[]) {
@@ -101,6 +151,24 @@ export class NodeStore implements StoragePort {
   public deindexKey(key: string, value: any): void {
     if (!this.#uniqKeyMap) { return; }
     delete this.#uniqKeyMap[key][value];
+  }
+
+  // derived indexes
+
+  public defineIndex<T>(name: string, projector: (store: StoragePort) => T): DerivedIndex<T> {
+    const index: DerivedIndex<T> = new DerivedIndex<T>(name, projector);
+    this.#indexes.push(index);
+    return index;
+  }
+
+  // the store-level mutation signal: mark every registered index stale. Fired
+  // from the semantic layer (base.onMutate) rather than from the crud primitives
+  // above, because many mutations happen directly on node objects (connect,
+  // graft, node.flush, ...) and never pass through the store's crud at all.
+  public invalidateIndexes(): void {
+    for (const index of this.#indexes) {
+      index.invalidate();
+    }
   }
 
   // (de)serialization -- the refactor #2 persistence hook

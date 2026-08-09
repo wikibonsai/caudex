@@ -1,33 +1,52 @@
-import type { Attrs, ConnectOpts, DisconnectOpts, Embed, Embeds, Link, Links, Mixin, QueryOpts } from './types';
+import type { Attrs, BackRefs, ConnectOpts, DisconnectOpts, Embed, Embeds, Link, Links, Mixin, QueryOpts } from './types';
 import { DATA_STRUCT, NODE, QUERY_TYPE, REL } from './const';
 import { Node } from './node';
+import { DerivedIndex, StoragePort } from './store';
 
 
 export function Web<TBase extends Mixin>(Base: TBase) {
   return class Web extends Base {
 
     // back-ref (inverse) index — a derived cache over the authoritative forward refs.
-    // 'targetId -> Set<sourceId>' per ref kind, rebuilt lazily from a full scan when
-    // 'backRefsIndexDirty'. Lives in the WEB mixin (only web queries read it — backlinks /
-    // backattrs / backembeds); field-initialized because Web has no constructor.
-    public backRefsIndex: {
-      attr: Map<string, Set<string>>;
-      link: Map<string, Set<string>>;
-      embed: Map<string, Set<string>>;
-    } = { attr: new Map(), link: new Map(), embed: new Map() };
-    public backRefsIndexDirty: boolean = true;
+    // 'targetId -> Set<sourceId>' per ref kind. Registered against the store, so
+    // base-level mutations (add / rm / fill / clear / flushRels) invalidate it via
+    // the 'invalidateIndexes' sweep (no onMutate override needed); web-only
+    // mutations (connect / disconnect / retype / transfer / flushRelRefs)
+    // invalidate it directly. The projector stores only WHICH sources point at a
+    // target, not the type/header/media of the edge — those stay authoritative on
+    // the source node and are read back during query reconstruction, so retype/
+    // edit can never desync this cache. It iterates in index-insertion order so
+    // each target's source Set is ordered the same way the previous full-scan
+    // implementation emitted them. Field-initialized (Web has no constructor).
+    public backRefsIndex: DerivedIndex<BackRefs> = this.store.defineIndex(
+      'backRefsIndex',
+      (store: StoragePort): BackRefs => {
+        const attr = new Map<string, Set<string>>();
+        const link = new Map<string, Set<string>>();
+        const embed = new Map<string, Set<string>>();
+        const addTo = (m: Map<string, Set<string>>, target: string, source: string): void => {
+          let sources = m.get(target);
+          if (!sources) { sources = new Set<string>(); m.set(target, sources); }
+          sources.add(source);
+        };
+        for (const node of store.all()) {
+          for (const ids of Object.values(node.attrs)) {
+            for (const targetID of ids) { addTo(attr, targetID, node.id); }
+          }
+          for (const l of node.links) { addTo(link, l.id, node.id); }
+          for (const e of node.embeds) { addTo(embed, e.id, node.id); }
+        }
+        return { attr, link, embed };
+      },
+    );
+
+    public get backRefsIndexDirty(): boolean {
+      return this.backRefsIndex.dirty;
+    }
 
     // mark the back-ref index stale; the next back-view query rebuilds it.
     public invalidateBackRefsIndex(): void {
-      this.backRefsIndexDirty = true;
-    }
-
-    // any base-level mutation (add / rm / fill / clear / flushRels) can change the
-    // forward refs → stale backRefsIndex. Hook base's onMutate, chaining super so the
-    // tree mixin's parentIndex invalidation still runs.
-    public onMutate(): void {
-      super.onMutate();
-      this.invalidateBackRefsIndex();
+      this.backRefsIndex.invalidate();
     }
 
     // properties
@@ -106,9 +125,9 @@ export function Web<TBase extends Mixin>(Base: TBase) {
     backrefs(id: string, opts?: QueryOpts): string[] | Node[] | any[] | undefined {
       this.checkLock();
       if (!this.has(id)) { return undefined; }
-      this.ensureBackRefsIndex();
+      const backRefs: BackRefs = this.ensureBackRefsIndex();
       const sources: Set<string> = new Set<string>();
-      for (const kindMap of [this.backRefsIndex.attr, this.backRefsIndex.link, this.backRefsIndex.embed]) {
+      for (const kindMap of [backRefs.attr, backRefs.link, backRefs.embed]) {
         for (const sourceID of (kindMap.get(id) ?? new Set<string>())) { sources.add(sourceID); }
       }
       const ids: string[] = [...sources];
@@ -143,9 +162,9 @@ export function Web<TBase extends Mixin>(Base: TBase) {
         throw new Error('attrs do not support headers');
       }
       if (!this.has(id)) { return undefined; }
-      this.ensureBackRefsIndex();
+      const backRefs: BackRefs = this.ensureBackRefsIndex();
       const backattrs: Attrs = {} as Attrs;
-      for (const sourceID of (this.backRefsIndex.attr.get(id) ?? new Set<string>())) {
+      for (const sourceID of (backRefs.attr.get(id) ?? new Set<string>())) {
         const node: Node | undefined = this.index[sourceID];
         if (!node) { continue; }
         for (const [type, ids] of Object.entries(node.attrs)) {
@@ -189,9 +208,9 @@ export function Web<TBase extends Mixin>(Base: TBase) {
     backlinks(id: string, opts?: QueryOpts): Links | [any, any][] | undefined {
       this.checkLock();
       if (!this.has(id)) { return undefined; }
-      this.ensureBackRefsIndex();
+      const backRefs: BackRefs = this.ensureBackRefsIndex();
       const backlinks: Links = [];
-      for (const sourceID of (this.backRefsIndex.link.get(id) ?? new Set<string>())) {
+      for (const sourceID of (backRefs.link.get(id) ?? new Set<string>())) {
         const node: Node | undefined = this.index[sourceID];
         if (!node) { continue; }
         for (const link of node.links) {
@@ -234,9 +253,9 @@ export function Web<TBase extends Mixin>(Base: TBase) {
     backembeds(id: string, opts?: QueryOpts): Embeds | any[] | undefined {
       this.checkLock();
       if (!this.has(id)) { return undefined; }
-      this.ensureBackRefsIndex();
+      const backRefs: BackRefs = this.ensureBackRefsIndex();
       const backembeds: Embeds = [];
-      for (const sourceID of (this.backRefsIndex.embed.get(id) ?? new Set<string>())) {
+      for (const sourceID of (backRefs.embed.get(id) ?? new Set<string>())) {
         const node: Node | undefined = this.index[sourceID];
         if (!node) { continue; }
         for (const embed of node.embeds) {
@@ -546,39 +565,19 @@ export function Web<TBase extends Mixin>(Base: TBase) {
       return true;
     }
 
-    // back-ref (inverse) index
-    //
-    // 'backRefsIndex.<kind>' maps 'targetId -> Set<sourceId>' for the sources that
-    // reference a target. it stores only WHICH sources point at a target, not
-    // the type/header/media of the edge -- those stay authoritative on the
-    // source node and are read back during query reconstruction, so retype/edit
-    // can never desync this cache. it is a pure derivation of the forward refs,
-    // rebuilt from a full scan whenever dirty (invalidated on any mutation).
+    // back-ref (inverse) index -- the projection itself lives in the field
+    // declaration up top; these are the rebuild/ensure faces over it.
 
     public rebuildBackRefsIndex(): void {
-      const attr = new Map<string, Set<string>>();
-      const link = new Map<string, Set<string>>();
-      const embed = new Map<string, Set<string>>();
-      const addTo = (m: Map<string, Set<string>>, target: string, source: string): void => {
-        let sources = m.get(target);
-        if (!sources) { sources = new Set<string>(); m.set(target, sources); }
-        sources.add(source);
-      };
-      // iterate in index-insertion order so each target's source Set is ordered
-      // the same way the previous full-scan implementation emitted them.
-      for (const node of Object.values(this.index)) {
-        for (const ids of Object.values(node.attrs)) {
-          for (const targetID of ids) { addTo(attr, targetID, node.id); }
-        }
-        for (const l of node.links) { addTo(link, l.id, node.id); }
-        for (const e of node.embeds) { addTo(embed, e.id, node.id); }
-      }
-      this.backRefsIndex = { attr, link, embed };
-      this.backRefsIndexDirty = false;
+      this.backRefsIndex.rebuild(this.store);
     }
 
-    public ensureBackRefsIndex(): void {
-      if (this.backRefsIndexDirty) { this.rebuildBackRefsIndex(); }
+    // re-project only if stale, then serve. Routes through the public
+    // 'rebuildBackRefsIndex()' (not DerivedIndex.ensure) so the rebuild stays an
+    // observable seam (tests spy on it to assert the caching behavior).
+    public ensureBackRefsIndex(): BackRefs {
+      if (this.backRefsIndex.dirty) { this.rebuildBackRefsIndex(); }
+      return this.backRefsIndex.value as BackRefs;
     }
 
   };

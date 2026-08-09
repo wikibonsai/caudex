@@ -1,6 +1,7 @@
 import assert from 'node:assert';
 
-import { NodeStore } from '../src/store';
+import type { StoragePort } from '../src/store';
+import { DerivedIndex, NodeStore } from '../src/store';
 import { Node, NODE } from '../src/index';
 
 
@@ -123,6 +124,70 @@ describe('store (StoragePort)', () => {
       const node: Node = buildNode('1', { filename: 'one' });
       store.put(node);
       assert.strictEqual(store.serialize(), JSON.stringify({ '1': node }));
+    });
+
+  });
+
+  describe('derived indexes', () => {
+
+    let projectorCalls: number;
+
+    beforeEach(() => {
+      store = new NodeStore(['filename']);
+      projectorCalls = 0;
+    });
+
+    const countProjector = (s: StoragePort): number => {
+      projectorCalls += 1;
+      return s.all().length;
+    };
+
+    it('starts dirty; first ensure() projects, then serves from cache', () => {
+      const idx: DerivedIndex<number> = store.defineIndex('count', countProjector);
+      assert.strictEqual(idx.dirty, true);
+      store.put(buildNode('1'));
+      assert.strictEqual(idx.ensure(store), 1);
+      assert.strictEqual(idx.dirty, false);
+      assert.strictEqual(projectorCalls, 1);
+      // cached -- no re-projection
+      assert.strictEqual(idx.ensure(store), 1);
+      assert.strictEqual(projectorCalls, 1);
+    });
+
+    it('invalidate() marks dirty; next ensure() re-projects', () => {
+      const idx: DerivedIndex<number> = store.defineIndex('count', countProjector);
+      idx.ensure(store);
+      idx.invalidate();
+      assert.strictEqual(idx.dirty, true);
+      store.put(buildNode('1'));
+      assert.strictEqual(idx.ensure(store), 1);
+      assert.strictEqual(projectorCalls, 2);
+    });
+
+    it('rebuild() re-projects unconditionally and clears dirty', () => {
+      const idx: DerivedIndex<number> = store.defineIndex('count', countProjector);
+      idx.ensure(store);
+      idx.rebuild(store);
+      assert.strictEqual(projectorCalls, 2);
+      assert.strictEqual(idx.dirty, false);
+    });
+
+    it('value; reads the current projection without rebuilding', () => {
+      const idx: DerivedIndex<number> = store.defineIndex('count', countProjector);
+      assert.strictEqual(idx.value, undefined);
+      idx.ensure(store);
+      assert.strictEqual(idx.value, 0);
+      assert.strictEqual(projectorCalls, 1);
+    });
+
+    it('invalidateIndexes(); sweeps every registered index', () => {
+      const one: DerivedIndex<number> = store.defineIndex('one', countProjector);
+      const two: DerivedIndex<number> = store.defineIndex('two', countProjector);
+      one.ensure(store);
+      two.ensure(store);
+      store.invalidateIndexes();
+      assert.strictEqual(one.dirty, true);
+      assert.strictEqual(two.dirty, true);
     });
 
   });

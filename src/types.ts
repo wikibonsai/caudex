@@ -91,6 +91,13 @@ export interface Links extends Array<Link> {}
 /* eslint-disable-next-line @typescript-eslint/no-empty-interface */
 export interface Embeds extends Array<Embed> {}
 
+// the back-ref (inverse) index shape: 'targetId -> Set<sourceId>' per ref kind.
+export interface BackRefs {
+  attr: Map<string, Set<string>>;
+  link: Map<string, Set<string>>;
+  embed: Map<string, Set<string>>;
+}
+
 ////
 // query system
 

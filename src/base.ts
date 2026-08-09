@@ -114,11 +114,12 @@ export class Base {
     return configdNanoid();
   }
 
-  // Generic "the node set / forward refs changed" hook. Derived-index mixins
-  // (web: backRefsIndex, tree: parentIndex) OVERRIDE this and chain via super() to mark
-  // their caches stale on any base-level mutation. Base can't reference those
-  // indexes directly (it's the innermost mixin), so it just fires this signal.
-  public onMutate(): void { /* no-op at base -- no derived indexes of its own to invalidate */ }
+  // Generic "the node set changed" hook, fired on every base-level mutation.
+  // Sweeps all derived indexes registered against the store (tree: parentIndex,
+  // web: backRefsIndex) -- replacing the old per-mixin override + super() chain.
+  public onMutate(): void {
+    this.store.invalidateIndexes();
+  }
 
   public print(printout: boolean = true): string {
     this.checkLock();
