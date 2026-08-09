@@ -113,9 +113,9 @@ Every mutation signals a typed change event through the caudex's `store`. Subscr
 ```ts
 const unsubscribe = caudex.store.onChange((e) => {
   // e: { kind: 'node' | 'tree' | 'web', op: string, id?: string }
-  //   'node' -- the node set changed    (add / rm / fill / flushRels / clear)
-  //   'tree' -- the hierarchy changed   (graft / prune / replace / transplant / flushRelFams)
-  //   'web'  -- the relations changed   (connect / disconnect / retype / transfer / flushRelRefs)
+  //   'node' -- the node set changed    (add / rm / fill / flushGraph / clear)
+  //   'tree' -- the hierarchy changed   (graft / prune / replace / transplant / flushTree)
+  //   'web'  -- the relations changed   (connect / disconnect / retype / transfer / flushWeb)
 });
 // ...
 unsubscribe();
@@ -129,15 +129,18 @@ There is some terminology that will help in understanding the innerworkings of t
 
 ### Data Structures
 
-- Base: Basic functions of the index, such as storing the hash map of node id's to nodes and the ability to add/edit/remove nodes.
+- Base: The storage-facing layer -- owns the store (node ids -> nodes, unique-key lookups) and node crud (add/edit/remove), and signals change events.
 - Tree: A hierarchical structure; good for ordering information.
 - Web: A graph structure; good for associative traversal.
+- Phase: Cross-axis queries over both structures at once -- a node's integration phase requires seeing the tree *and* the web, so it sits atop the other layers (see "State & Phase").
 
-Under the hood, the `caudex` is essentially one hash table whose keys are node ids and values are the nodes themselves. (Concretely, that hash table lives in a `NodeStore` collaborator behind a `StoragePort` interface, and derived caches -- the tree's parent index, the web's back-ref index -- are `DerivedIndex` projections over it, kept fresh by the change events described above.) Properties (`all()`) and actions (`add()`, `edit()`, `rm()`) are all functions being run over the hash table to calculate the desired data. This implementation mirrors [pointers](https://en.wikipedia.org/wiki/Pointer_(computer_programming)), since [javascript/typescript doesn't have them](https://stackoverflow.com/questions/17382427/are-there-pointers-in-javascript#:~:text=No%2C%20JS%20doesn't%20have,the%20address%20of%20an%20object.). So, in pointer parlance, to "pass around a reference" you pass around a node id and to "dereference a pointer" in order to obtain the value (node) from the key (node id) in the hash table.
+Under the hood, the `caudex` is a **composition of semantic layers over one storage core**. The core (`NodeStore`, behind the `StoragePort` interface) owns the record of node ids -> nodes plus the unique-key lookups -- it is the single home of stored truth. Everything else the caudex knows is **derived**: the tree's parent index, the web's back-ref and edges views, and the phase layer's attachment sets are all `DerivedIndex` projections over the store -- lazily (re)built caches, invalidated precisely by the typed change events described above (a tree-only mutation stales only tree-scoped projections, and so on). The engine adapter on the roadmap swaps the store implementation without touching the layers -- the port is the seam.
 
-Mirroring pointer behavior allows for implementing tree and graph data structures that are truer to form. And, since most everything is a function, tree and web related functions are grouped into mix-ins that can be used (or not) based on need. By using the main `caudex`, which contains both `tree` and `web` functions, a hybrid tree-web data structure can be leveraged. ("web" can be thought of as synonymous with the computer science "graph" data structure)
+References between nodes mirror [pointers](https://en.wikipedia.org/wiki/Pointer_(computer_programming)), since [javascript/typescript doesn't have them](https://stackoverflow.com/questions/17382427/are-there-pointers-in-javascript#:~:text=No%2C%20JS%20doesn't%20have,the%20address%20of%20an%20object.): to "pass around a reference" you pass around a node id, and to "dereference" it you ask the caudex for the node (`get(id)`). Mirroring pointer behavior allows for implementing tree and graph data structures that are truer to form.
 
-The "base" portion handles all operations that would be expected in either the `tree` or `web` data structures, such as adding, editing, or removing a node.
+The semantic layers are composed as mixins that can be used (or not) based on need -- `Tree(Base)`, `Web(Base)`, or the full `Caudex = Phase(Web(Tree(Base)))` for the hybrid tree-web structure. ("web" can be thought of as synonymous with the computer science "graph" data structure.) The mixin chain is how the layers are *organized*; the architectural seams are the storage port, the derived indexes, and the change events. Note that the layering is capability-based: each query lives in the lowest layer that can answer it -- which is why `zombies()` (pure state, no axes needed) sits in base while `phases()` (needs both axes) sits at the top.
+
+The "base" portion handles the storage-facing operations either structure needs -- adding, editing, or removing a node -- and signals a change event for every mutation.
 
 ### Function Kinds
 
@@ -145,15 +148,15 @@ The "base" portion handles all operations that would be expected in either the `
 - Relational Properties: Methods that return relationship information of some node(s).
 - Actions: Methods that perform some action on the caudex or some node(s).
 
-As said before, the `caudex` is essentially a hash with a collection of functions to answer questions about the hash table. It is helpful to think of each function as fitting into one of a few categories that dictate how the function works and what it will return.
+Every answer the caudex gives is either read from the store or derived from it on demand -- nothing queryable is cached anywhere it could go stale. It is helpful to think of each method as fitting into one of a few categories that dictate how it works and what it returns.
 
-"Properties" are functions that describe the state of the `caudex`. For example, `all()` returns all of the node ids that currently exist and `nodetypes()` returns all of the nodetypes that exist.
+"Properties" are methods that describe the state of the `caudex`. For example, `all()` returns all of the node ids that currently exist and `nodetypes()`/`edgetypes()` return the open type vocabularies in use. A few properties live on the *node* rather than the caudex -- `node.state()` and `node.phase()` -- and are likewise derived at call time (phase reads the graph through a context bound at the node's creation).
 
-"Relational properties" are functions that describe relationships between nodes and often take an `id: string` argument. For example, `ancestors(id: string)` returns an array of node ids that form the ancestry of the node with the given `id` and `backlinks(id: string)` returns an array of node ids who contain the node with the given `id` in its links.
+"Relational properties" are methods that describe relationships between nodes and often take an `id: string` argument. For example, `ancestors(id: string)` returns an array of node ids that form the ancestry of the node with the given `id` and `backlinks(id: string)` returns an array of node ids who contain the node with the given `id` in its links. Inverse queries like these are backed by the derived indexes, so they are index-lookups, not full scans.
 
 Generally speaking, "property" and "relational property" functions will accept a `QUERY_TYPE` in addition to the required arguments. This can alter the return type based on need. For example, instead of receiving an array of node ids, by adding `QUERY_TYPE.NODE`, an array of all the nodes would be returned instead. See individual function docs for details.
 
-Finally, "Actions" are functions that perform some action on the `caudex` or a node in the `caudex`. For example, `add(data: any)` will parse the data payload and add a new node based on the data if it is valid and `edit(id: string, key: any, newValue: any)` updates the value for a node with the given `id` at the givne `key`.
+Finally, "Actions" are methods that perform some action on the `caudex` or a node in the `caudex`. For example, `add(data: any)` will parse the data payload and add a new node based on the data if it is valid and `edit(id: string, key: any, newValue: any)` updates the value for a node with the given `id` at the given `key`. Every mutating action signals a typed change event, which both invalidates the affected derived indexes and reaches any `onChange()` subscribers.
 
 ## Other Terms
 
@@ -173,13 +176,17 @@ Properties can be called with a `QUERY_TYPE`, which will determine the type of d
 
 Returns all node ids in the caudex.
 
-##### `nodetypes(): string[]`
+##### `nodetypes(): Set<string>`
 
-Returns an array of all nodetypes in the caudex.
+Returns every node type in the caudex -- the open `NODE.TYPE` vocabulary (doctypes).
+
+##### `edgetypes(): Set<string>`
+
+Returns every edge type in the caudex -- the open `EDGE.TYPE` vocabulary (reftypes): attr types + link types (embeds are untyped). Pairs with `nodetypes()`; supersedes the old web-only `reftypes()`. For kind-scoped surveys see `attrtypes()` / `linktypes()`.
 
 ##### `zombies(): string[]`
 
-Returns an array of node ids for all zombie nodes in the caudex.
+Returns an array of node ids for all zombie nodes in the caudex. (A zombie is a node whose **state** is `zombie` -- a reference with no document behind it. State derives from kind-absence: `kind` is `undefined` until `fill()`ed live -- see `node.state()`.)
 
 #### Actions
 
@@ -191,19 +198,19 @@ Verifies if a node id exists in the caudex; returns `true` if it does and `false
 
 Flushes / deletes node data. If no `id` is given, all data for all nodes is deleted. If an `id` is provided, then just the node data for the node with that id is flushed / deleted.
 
-##### `flushRels(): boolean`
+##### `flushGraph(): boolean`
 
-Flushes / deletes all node relationships, including family (tree) relationships and reference relationships (web) -- in the caudex.
+Flushes every relationship in the caudex -- both the tree axis (children) and the web axis (attrs / links / embeds). Nodes and their data are untouched; zombie nodes (which exist only to be referenced) are deleted.
 
 ##### `clear(): void`
 
 Delete the entire caudex.
 
-##### `add(data: any[, typeinfo: NodeTypeInfo]): Node | undefined`
+##### `add(data: any[, init: { id?, kind?, type? }]): Node | undefined`
 
 Add a new node to the caudex with the given `data` payload. If the node was added, whether successfully or by generating a zombie node, return the Node. If no node was created successfully, then `undefined` is returned.
 
-If an `id` is included in the `data` payload, it will be used as the node's id. If not, a new id will be generated for the node internally.
+`init` optionally sets the node's `id` (otherwise generated), `kind` (defaults to `NODE.KIND.DOC`), and `type` (defaults to `NODE.TYPE.DEFAULT`). Passing a plain string instead of a data payload creates a zombie keyed on the `zombieKey`.
 
 ##### `edit(id: string, key: any, newValue: any): boolean`
 
@@ -233,6 +240,35 @@ Alternatively, if the `key` is one of the caudex's `uniqKeys` `find` may be used
 
 Remove / delete a node from the caudex with the given `id`. Returns `true` if the node was deleted successfully and `false` if not.
 
+### State & Phase
+
+A node's state and phase are fully **derived, never stored**:
+
+##### `node.state(): NODE.STATE`
+
+Whether the document **exists**: `zombie` -> `live`. Derived from kind-absence (`kind` is `undefined` until `fill()`ed live). Graph-free -- works on any node.
+
+##### `node.phase(): NODE.PHASE`
+
+The node's **integration phase** -- tree x web attachment, a lifecycle of increasing connectedness:
+
+|                 | in web       | not in web   |
+|-----------------|--------------|--------------|
+| **in tree**     | `integrated` | `wallflower` |
+| **not in tree** | `orphan`     | `isolate`    |
+
+Evaluated lazily against the caudex's attachment indexes via a graph context bound at node creation, so the same node object always answers fresh. Reported truthfully for any node -- a referenced zombie reads `orphan` (its `state()` stays `zombie`). A node constructed outside a caudex has no graph context: `phase()` throws; `state()` works standalone.
+
+The attachment indexes live in the `Phase` layer atop tree + web (`Caudex = Phase(Web(Tree(Base)))`) -- phase is a cross-axis concern, so tree-only or web-only compositions don't have it.
+
+##### `phases(): Record<NODE.PHASE, string[]>`
+
+Returns the whole 2x2 in one pass: every **live** node id sorted into its phase cell. The bulk queries gate zombies out by state, so health ratios count only live docs.
+
+##### `integrated()` / `orphans()` / `wallflowers()` / `isolates()`
+
+Each returns one cell of `phases()`. (Note: `orphans` and `isolates` used to live on tree/web with single-axis meanings -- "leaf with no parent" and "no web neighbors" respectively; those retired with the TERMS reorg.)
+
 ### Tree
 
 #### Properties
@@ -240,12 +276,6 @@ Remove / delete a node from the caudex with the given `id`. Returns `true` if th
 ##### `root(): string | undefined`
 
 Returns the id of the root of the tree or `undefined` if none is set.
-
-##### `orphans([treeIDs: string[]]): string[] | undefined`
-
-Returns all of the ids of orphan nodes in the tree of the caudex.
-
-`treeIDs` optionally restricts which nodes should be considered; when omitted, every node in the caudex is checked.
 
 #### Relational Properties
 
@@ -273,15 +303,15 @@ Return an array of node ids for the descendents (all nodes below the target node
 
 Return an array of node ids for the lineage (all ancestors and descendents, excluding the target node) of the node with the given `id`.
 
-##### `level(id: string): number`
+##### `level(id: string): number | undefined`
 
-Returns the numeric level of the target node.
+Returns the numeric level of the target node (`undefined` for missing ids).
 
 #### Actions
 
-##### `flushRelFams()`
+##### `flushTree()`
 
-Flush / delete family relationships in the caudex.
+Flush the tree axis: every node's child pointers are cleared (web relationships untouched).
 
 ##### `graft(parentID: string, childID: string, force: boolean = false): boolean`
 
@@ -311,13 +341,9 @@ Print the tree to the console.
 
 #### Properties
 
-##### `isolates(): string[] | undefined`
+##### `edges(opts?: { source?, target?, kind?, type?, header? }): Edge[]`
 
-Returns all of the ids of isolated nodes (nodes not connected to the web) in the graph of the caudex.
-
-##### `reftypes(): Set<string>`
-
-Return all reftypes in the caudex.
+Every web connection reified as a normalized `Edge` object -- `{ source, target, kind, type?, header?, media?, position? }` and optionally filtered by `source` / `target` / `kind` / `type` / `header`. `position` is the occurrence anchor (character offset of the ref in the source doc): two otherwise-identical links at different positions are distinct occurrences, and context snippets / block-level citation derive from it (store the anchor, derive the sentence). This is a derived view over the node-owned forward refs; storage reification rides the engine adapter.
 
 ##### `attrtypes(): Set<string>`
 
@@ -365,41 +391,42 @@ Return an array of node ids for all neighbors / references.
 
 #### Actions
 
-##### `flushRelRefs([id: string]): boolean`
+##### `flushWeb([id: string]): boolean`
 
-Flush / delete all reference relationships. If no id is given, flush all reference
+Flush the web axis: attrs / links / embeds. With an `id`, flushes just that node's web relationships (cleaning up any zombie targets left unreferenced); with no `id`, flushes them for every node.
 
 (Useful for file deletions)
 
-##### `connect(source: string, target: string, opts: ConnectOpts | REL.REF[, typeOrMedia: string]): boolean`
+##### `connect(source: string, target: string, opts: ConnectOpts | EDGE.KIND[, typeOrMedia: string]): boolean`
 
-Connect a `source` node id to a `target` node id. Either pass the ref kind positionally with a type (or media, for embeds)...
+Connect a `source` node id to a `target` node id. Either pass the edge kind positionally with a type (or media, for embeds)...
 
 ```ts
-caudex.connect('1', '2', REL.REF.LINK, 'linktype');
-caudex.connect('1', '2', REL.REF.ATTR, 'attrtype');
-caudex.connect('1', '2', REL.REF.EMBED);            // media defaults to markdown
+caudex.connect('1', '2', EDGE.KIND.LINK, 'linktype');
+caudex.connect('1', '2', EDGE.KIND.ATTR, 'attrtype');
+caudex.connect('1', '2', EDGE.KIND.EMBED);                    // doc-embed (no media)
+caudex.connect('1', '2', EDGE.KIND.EMBED, NODE.MEDIA.IMAGE);  // media-embed
 ```
 
-...or pass a `ConnectOpts` object (`{ kind, type?, header?, media? }`) -- `header` scopes a link/embed to a header section (attrs do not support headers); `media` picks the embed media kind.
+...or pass a `ConnectOpts` object (`{ kind, type?, header?, media?, position? }`) -- `header` scopes a link/embed to a header section (attrs do not support headers); `media` picks the embed media kind (`pdf`/`audio`/`image`/`video`); `position` is the occurrence anchor (a link at a different position is a distinct occurrence, not a duplicate). Media-absence means a doc-transclusion -- markdown is not a media kind.
 
 (Useful for file and link creation)
 
-##### `retype(oldType: string, newType: string[, kind: REL.REF]): boolean`
+##### `retype(oldType: string, newType: string[, kind: EDGE.KIND]): boolean`
 
-Rename the reference type `oldType` to `newType` across every node. `kind` restricts the rename to attrs (`REL.REF.ATTR`) or links (`REL.REF.LINK`); the default (`REL.REF.REF`) renames both. Returns `true` if all renames succeeded.
+Rename the edge type `oldType` to `newType` across every node. `kind` restricts the rename to attrs (`EDGE.KIND.ATTR`) or links (`EDGE.KIND.LINK`); the default (`EDGE.KIND.REF`) renames both. Returns `true` if all renames succeeded.
 
 (Useful for attribute renames)
 
-##### `transfer(source: string, target: string, kind: REL.REF = REL.REF.REF): boolean`
+##### `transfer(source: string, target: string, kind: EDGE.KIND = EDGE.KIND.REF): boolean`
 
 Transfer the relationships from the `source` node to the `target` node via their IDs. Kind of relationships to transfer can be filtered by the `kind` var. Returns `true` on successful transfer.
 
 (Useful for file renames)
 
-##### `disconnect(source: string, target: string, opts: DisconnectOpts | REL.REF[, typeOrMedia: string]): boolean`
+##### `disconnect(source: string, target: string, opts: DisconnectOpts | EDGE.KIND[, typeOrMedia: string]): boolean`
 
-Disconnect a `source` node id from a `target` node id. Accepts the same positional and options forms as `connect()`.
+Disconnect a `source` node id from a `target` node id. Accepts the same positional and options forms as `connect()`. A given `position` removes only that occurrence; omitting it is position-blind (removes the first match regardless of anchor).
 
 
 [^inspire]: Logo inspired by [databases](https://cdn-icons-png.flaticon.com/512/20/20093.png) and [caudexes](https://www.google.com/search?q=caudex&source=lnms&tbm=isch&sa=X&ved=2ahUKEwiD_LbPwr36AhUsRTABHdXOBq0Q_AUoAXoECAIQAw&biw=1011&bih=800&dpr=2) -- especially [this one](https://thumbs.dreamstime.com/z/adenium-shrub-branched-caudex-green-foliage-illustration-colored-pencils-229255411.jpg).
