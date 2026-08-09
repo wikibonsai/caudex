@@ -69,22 +69,10 @@ export function Web<TBase extends Mixin>(Base: TBase) {
 
     // web-lvl
 
-    reftypes(): Set<string> {
-      this.checkLock();
-      let reftypes: string[] = [] as string[];
-      /* eslint-disable indent */
-      (this.all({ payload: QUERY_TYPE.NODE }) as Node[] ?? []).forEach((node: Node) => {
-            const attrTypes: string[] = Object.keys(node.attrs)
-                                              .map((type) => type);
-            // @ts-expect-error: typescript is not smart enough to see 'filter' performing validation
-            const linkTypes: string[] = node.links
-                                            .filter((link: Link) => link !== undefined)
-                                            .map((link: Link) => link.type);
-            reftypes = reftypes.concat(attrTypes).concat(linkTypes);
-          });
-      /* eslint-enable indent */
-      return new Set(reftypes);
-    }
+    // note: the all-kinds type survey lives in base as 'edgetypes()' (pairing
+    // with 'nodetypes()'); the old web-only 'reftypes()' retired with the
+    // node/edge vocabulary. attrtypes()/linktypes() below remain as the
+    // kind-scoped refinements.
 
     attrtypes(): Set<string> {
       this.checkLock();

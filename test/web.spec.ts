@@ -79,22 +79,8 @@ describe('web', () => {
 
   describe('properties', () => {
 
-    describe('reftypes', () => {
-
-      it('base', () => {
-        const node: Node | undefined = wiki.get('1');
-        if (!node) { assert.fail(); }
-        node.attrs = {
-          'attrtype': new Set(['2']),
-        };
-        node.links = [{
-          id: '3',
-          type: 'linktype',
-        }];
-        assert.deepEqual(wiki.reftypes(), new Set(['attrtype', 'linktype']));
-      });
-
-    });
+    // note: the all-kinds type survey moved to base as 'edgetypes()' (pairing
+    // with 'nodetypes()') -- see base.spec.ts. web's old 'reftypes()' retired.
 
     describe('attrtypes', () => {
 

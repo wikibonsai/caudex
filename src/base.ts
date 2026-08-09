@@ -203,6 +203,23 @@ export class Base {
     return new Set(nodetypes);
   }
 
+  // every edge type in the caudex -- the open EDGE.TYPE vocabulary, pairing
+  // with nodetypes() above. attr types + link types; embeds are untyped.
+  // (supersedes web's reftypes() under the node/edge vocabulary.)
+  edgetypes(): Set<string> {
+    this.checkLock();
+    const edgetypes: Set<string> = new Set<string>();
+    for (const node of this.store.all()) {
+      for (const attrType of Object.keys(node.attrs)) {
+        edgetypes.add(attrType);
+      }
+      for (const link of node.links) {
+        if (link.type !== undefined) { edgetypes.add(link.type); }
+      }
+    }
+    return edgetypes;
+  }
+
   zombies(opts?: QueryOpts): string[] | Node[] | any[] | undefined {
     this.checkLock();
     const mergedFilter = { ...opts?.filter, nodeState: NODE.STATE.ZOMBIE };

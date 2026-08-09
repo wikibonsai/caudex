@@ -102,6 +102,28 @@ describe('base', () => {
 
   });
 
+  describe('type surveys (the open TYPE vocabularies)', () => {
+
+    it('nodetypes(); every node type in the caudex', () => {
+      base.index['1'].type = 'entry';
+      base.index['2'].type = 'index';
+      assert.deepEqual(base.nodetypes(), new Set(['entry', 'index']));
+    });
+
+    it('edgetypes(); every edge type in the caudex (attr + link; embeds are untyped)', () => {
+      base.index['1'].attrs['attrtype'] = new Set(['2']);
+      base.index['1'].links.push({ id: '2', type: 'linktype' });
+      base.index['2'].links.push({ id: '1', type: 'linktype' });   // dupes collapse
+      base.index['2'].embeds.push({ id: '1' });                    // no type contributed
+      assert.deepEqual(base.edgetypes(), new Set(['attrtype', 'linktype']));
+    });
+
+    it('edgetypes(); empty web yields an empty set', () => {
+      assert.deepEqual(base.edgetypes(), new Set());
+    });
+
+  });
+
   describe('index operations', () => {
 
     describe('has()', () => {
