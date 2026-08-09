@@ -44,24 +44,13 @@ export namespace NODE {
   }
 }
 
-// relationship information (rel kind) //
+// edge information ('edge kind', 'edge type') //
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
-export namespace REL {
-
-  // tree
-  export enum FAM {
-    FAM         = 'fam',         // all
-    ANCESTORS   = 'ancestors',   // all up
-    PARENT      = 'parent',      // one up
-    SIBLINGS    = 'siblings',    // all sides
-    CHILDREN    = 'children',    // one down
-    DESCENDANTS = 'descendants', // all down
-    LINEAGE     = 'lineage',     // all up + all down - self (excludes self)
-  }
+export namespace EDGE {
 
   // web (same as 'wikirefs.CONST.KIND')
-  export enum REF {
+  export enum KIND {
     REF         = 'ref',         // attr + link + embed
     ATTR        = 'attr',
     LINK        = 'link',
@@ -81,7 +70,9 @@ export enum QUERY_TYPE {
   ID          = 'id',
   NODE        = 'node',
   NODEKIND    = 'nodekind',      // 'NODE.KIND'
-  NODETYPE    = 'nodetype',      // 'NODE.TYPE'
+  NODETYPE    = 'nodetype',      // custom type field
+  EDGEKIND    = 'edgekind',      // 'EDGE.KIND'
+  EDGETYPE    = 'edgetype',      // custom type field
   DATA        = 'data',
-  ZOMBIE      = 'zombie',        // 'NODE.KIND.ZOMBIE'
+  ZOMBIE      = 'zombie',        // the zombie-key value ('data[zombieKey]')
 }

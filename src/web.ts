@@ -1,5 +1,5 @@
 import type { Attrs, BackRefs, ConnectOpts, DisconnectOpts, Embed, Embeds, Link, Links, Mixin, QueryOpts } from './types';
-import { DATA_STRUCT, NODE, QUERY_TYPE, REL } from './const';
+import { DATA_STRUCT, NODE, QUERY_TYPE, EDGE } from './const';
 import { Node } from './node';
 import { DerivedIndex, StoragePort } from './store';
 
@@ -9,9 +9,9 @@ export function Web<TBase extends Mixin>(Base: TBase) {
 
     // back-ref (inverse) index — a derived cache over the authoritative forward refs.
     // 'targetId -> Set<sourceId>' per ref kind. Registered against the store, so
-    // base-level mutations (add / rm / fill / clear / flushRels) invalidate it via
+    // base-level mutations (add / rm / fill / clear / flushGraph) invalidate it via
     // the 'invalidateIndexes' sweep (no onMutate override needed); web-only
-    // mutations (connect / disconnect / retype / transfer / flushRelRefs)
+    // mutations (connect / disconnect / retype / transfer / flushWeb)
     // invalidate it directly. The projector stores only WHICH sources point at a
     // target, not the type/header/media of the edge — those stay authoritative on
     // the source node and are read back during query reconstruction, so retype/
@@ -138,7 +138,7 @@ export function Web<TBase extends Mixin>(Base: TBase) {
 
     foreattrs(id: string, opts?: QueryOpts): Attrs | Record<string, Node[]> | Record<string, any> | undefined {
       this.checkLock();
-      if (opts?.filter?.header !== undefined || opts?.filter?.level === REL.LEVEL.HEADER) {
+      if (opts?.filter?.header !== undefined || opts?.filter?.level === EDGE.LEVEL.HEADER) {
         throw new Error('attrs do not support headers');
       }
       const node: Node | undefined = this.get(id, { payload: QUERY_TYPE.NODE });
@@ -159,7 +159,7 @@ export function Web<TBase extends Mixin>(Base: TBase) {
 
     backattrs(id: string, opts?: QueryOpts): Attrs | Record<string, Node[]> | Record<string, any> | undefined {
       this.checkLock();
-      if (opts?.filter?.header !== undefined || opts?.filter?.level === REL.LEVEL.HEADER) {
+      if (opts?.filter?.header !== undefined || opts?.filter?.level === EDGE.LEVEL.HEADER) {
         throw new Error('attrs do not support headers');
       }
       if (!this.has(id)) { return undefined; }
@@ -196,8 +196,8 @@ export function Web<TBase extends Mixin>(Base: TBase) {
       const f = opts?.filter;
       let links: Link[] = node.links;
       if (f?.header !== undefined) { links = links.filter((l) => l.header === f.header); }
-      if (f?.level === REL.LEVEL.FILE) { links = links.filter((l) => !l.header); }
-      if (f?.level === REL.LEVEL.HEADER) { links = links.filter((l) => !!l.header); }
+      if (f?.level === EDGE.LEVEL.FILE) { links = links.filter((l) => !l.header); }
+      if (f?.level === EDGE.LEVEL.HEADER) { links = links.filter((l) => !!l.header); }
       if (f?.type !== undefined) { links = links.filter((l) => l.type === f.type); }
       const payload = opts?.payload ?? QUERY_TYPE.ID;
       if (payload === QUERY_TYPE.ID || payload === undefined) {
@@ -218,8 +218,8 @@ export function Web<TBase extends Mixin>(Base: TBase) {
           if (id !== link.id) { continue; }
           const f = opts?.filter;
           if (f?.header !== undefined && link.header !== f.header) { continue; }
-          if (f?.level === REL.LEVEL.FILE && link.header) { continue; }
-          if (f?.level === REL.LEVEL.HEADER && !link.header) { continue; }
+          if (f?.level === EDGE.LEVEL.FILE && link.header) { continue; }
+          if (f?.level === EDGE.LEVEL.HEADER && !link.header) { continue; }
           if (f?.type !== undefined && link.type !== f.type) { continue; }
           backlinks.push({
             type: link.type,
@@ -242,8 +242,8 @@ export function Web<TBase extends Mixin>(Base: TBase) {
       const f = opts?.filter;
       let embeds: Embed[] = node.embeds;
       if (f?.header !== undefined) { embeds = embeds.filter((e) => e.header === f.header); }
-      if (f?.level === REL.LEVEL.FILE) { embeds = embeds.filter((e) => !e.header); }
-      if (f?.level === REL.LEVEL.HEADER) { embeds = embeds.filter((e) => !!e.header); }
+      if (f?.level === EDGE.LEVEL.FILE) { embeds = embeds.filter((e) => !e.header); }
+      if (f?.level === EDGE.LEVEL.HEADER) { embeds = embeds.filter((e) => !!e.header); }
       const payload = opts?.payload ?? QUERY_TYPE.ID;
       if (payload === QUERY_TYPE.ID || payload === undefined) {
         return embeds;
@@ -263,8 +263,8 @@ export function Web<TBase extends Mixin>(Base: TBase) {
           if (id !== embed.id) { continue; }
           const f = opts?.filter;
           if (f?.header !== undefined && embed.header !== f.header) { continue; }
-          if (f?.level === REL.LEVEL.FILE && embed.header) { continue; }
-          if (f?.level === REL.LEVEL.HEADER && !embed.header) { continue; }
+          if (f?.level === EDGE.LEVEL.FILE && embed.header) { continue; }
+          if (f?.level === EDGE.LEVEL.HEADER && !embed.header) { continue; }
           backembeds.push({
             id: node.id,
             ...(embed.media !== undefined && { media: embed.media }),
@@ -279,27 +279,27 @@ export function Web<TBase extends Mixin>(Base: TBase) {
       return backembeds.map((embed) => this.get(embed.id, { ...opts, payload }));
     }
 
-    neighbors(id: string, kindOrOpts?: REL.REF | QueryOpts): string[] | undefined {
+    neighbors(id: string, kindOrOpts?: EDGE.KIND | QueryOpts): string[] | undefined {
       this.checkLock();
-      const kind = (typeof kindOrOpts === 'string' && Object.values(REL.REF).includes(kindOrOpts))
+      const kind = (typeof kindOrOpts === 'string' && Object.values(EDGE.KIND).includes(kindOrOpts))
         ? kindOrOpts
-        : (kindOrOpts as QueryOpts)?.filter?.kind ?? REL.REF.REF;
+        : (kindOrOpts as QueryOpts)?.filter?.kind ?? EDGE.KIND.REF;
       let neighbors: string[] = [];
       const node: Node | undefined = this.get(id, { payload: QUERY_TYPE.NODE });
       if (!node) { return undefined; }
-      if ((kind === REL.REF.REF) || (kind === REL.REF.ATTR)) {
+      if ((kind === EDGE.KIND.REF) || (kind === EDGE.KIND.ATTR)) {
         const backattrs = this.backattrs(id) ?? {};
         neighbors = neighbors
           .concat(Object.values(node.attrs).flatMap((ids) => Array.from(ids)))
           .concat(Object.values(backattrs).flatMap((ids: Set<string>) => Array.from(ids)));
       }
-      if ((kind === REL.REF.REF) || (kind === REL.REF.LINK)) {
+      if ((kind === EDGE.KIND.REF) || (kind === EDGE.KIND.LINK)) {
         const backlinks = (this.backlinks(id) ?? []) as Links;
         neighbors = neighbors
           .concat(node.links.map((link: Link) => link.id))
           .concat(backlinks.map((link: Link | { id: string }) => link.id));
       }
-      if ((kind === REL.REF.REF) || (kind === REL.REF.EMBED)) {
+      if ((kind === EDGE.KIND.REF) || (kind === EDGE.KIND.EMBED)) {
         const backembeds = (this.backembeds(id) ?? []) as Embeds;
         neighbors = neighbors
           .concat(node.embeds.map((embed: Embed) => embed.id))
@@ -310,9 +310,9 @@ export function Web<TBase extends Mixin>(Base: TBase) {
 
     // methods
 
-    public flushRelRefs(id?: string): boolean {
+    public flushWeb(id?: string): boolean {
       this.checkLock();
-      this.store.signal({ kind: 'web', op: 'flushRelRefs', ...(id !== undefined && { id }) });
+      this.store.signal({ kind: 'web', op: 'flushWeb', ...(id !== undefined && { id }) });
       // single
       if (id) {
         const node: Node | undefined = this.get(id);
@@ -360,21 +360,21 @@ export function Web<TBase extends Mixin>(Base: TBase) {
 
     // add
 
-    public connect(sourceID: string, targetID: string, optsOrKind: ConnectOpts | REL.REF, typeOrMedia?: string): boolean {
-      const opts: ConnectOpts = (typeof optsOrKind === 'string' && Object.values(REL.REF).includes(optsOrKind))
+    public connect(sourceID: string, targetID: string, optsOrKind: ConnectOpts | EDGE.KIND, typeOrMedia?: string): boolean {
+      const opts: ConnectOpts = (typeof optsOrKind === 'string' && Object.values(EDGE.KIND).includes(optsOrKind))
         ? {
           kind: optsOrKind,
-          type: optsOrKind === REL.REF.EMBED ? undefined : (typeOrMedia ?? ''),
+          type: optsOrKind === EDGE.KIND.EMBED ? undefined : (typeOrMedia ?? ''),
           // media stays undefined for doc-embeds (markdown is not a media kind)
-          media: optsOrKind === REL.REF.EMBED ? (typeOrMedia as NODE.MEDIA | undefined) : undefined,
+          media: optsOrKind === EDGE.KIND.EMBED ? (typeOrMedia as NODE.MEDIA | undefined) : undefined,
         }
         : optsOrKind as ConnectOpts;
       const { kind, type = '', header, media } = opts;
-      if (kind === REL.REF.REF) {
-        console.warn('please connect to a more specific relationship(\'REL.REF.ATTR\', \'REL.REF.LINK\', or \'REL.REF.EMBED\'');
+      if (kind === EDGE.KIND.REF) {
+        console.warn('please connect to a more specific relationship(\'EDGE.KIND.ATTR\', \'EDGE.KIND.LINK\', or \'EDGE.KIND.EMBED\'');
         return false;
       }
-      if (kind === REL.REF.ATTR && header !== undefined) {
+      if (kind === EDGE.KIND.ATTR && header !== undefined) {
         throw new Error('attrs do not support headers');
       }
       this.checkLock();
@@ -388,7 +388,7 @@ export function Web<TBase extends Mixin>(Base: TBase) {
         console.warn(`target node with id "${targetID}" not found`);
         return false;
       }
-      if (kind === REL.REF.ATTR) {
+      if (kind === EDGE.KIND.ATTR) {
         if (!Object.keys(sourceNode.attrs).includes(type)) {
           sourceNode.attrs[type] = new Set([targetID]);
         } else {
@@ -396,7 +396,7 @@ export function Web<TBase extends Mixin>(Base: TBase) {
         }
         return sourceNode.attrs[type].has(targetID);
       }
-      if (kind === REL.REF.LINK) {
+      if (kind === EDGE.KIND.LINK) {
         const hasLink = sourceNode.links.find((link: Link) =>
           link.type === type && link.id === targetID && link.header === header
         );
@@ -409,7 +409,7 @@ export function Web<TBase extends Mixin>(Base: TBase) {
         }
         return true;
       }
-      if (kind === REL.REF.EMBED) {
+      if (kind === EDGE.KIND.EMBED) {
         // media-absence = doc-embed; a given media must be a real media kind
         if ((media !== undefined) && !Object.values(NODE.MEDIA).includes(media)) {
           console.warn('invalid media kind: ' + media);
@@ -432,18 +432,18 @@ export function Web<TBase extends Mixin>(Base: TBase) {
 
     // edit
 
-    public disconnect(sourceID: string, targetID: string, optsOrKind: DisconnectOpts | REL.REF, typeOrMedia?: string): boolean {
-      const opts: DisconnectOpts = (typeof optsOrKind === 'string' && Object.values(REL.REF).includes(optsOrKind))
+    public disconnect(sourceID: string, targetID: string, optsOrKind: DisconnectOpts | EDGE.KIND, typeOrMedia?: string): boolean {
+      const opts: DisconnectOpts = (typeof optsOrKind === 'string' && Object.values(EDGE.KIND).includes(optsOrKind))
         ? {
           kind: optsOrKind,
-          type: optsOrKind === REL.REF.EMBED ? undefined : (typeOrMedia ?? ''),
+          type: optsOrKind === EDGE.KIND.EMBED ? undefined : (typeOrMedia ?? ''),
           // media stays undefined for doc-embeds (markdown is not a media kind)
-          media: optsOrKind === REL.REF.EMBED ? (typeOrMedia as NODE.MEDIA | undefined) : undefined,
+          media: optsOrKind === EDGE.KIND.EMBED ? (typeOrMedia as NODE.MEDIA | undefined) : undefined,
         }
         : optsOrKind as DisconnectOpts;
       const { kind, type = '', header, media } = opts;
-      if (kind === REL.REF.REF) {
-        console.warn('please disconnect a more specific relationship(\'REL.REF.ATTR\', \'REL.REF.LINK\', or \'REL.REF.EMBED\'');
+      if (kind === EDGE.KIND.REF) {
+        console.warn('please disconnect a more specific relationship(\'EDGE.KIND.ATTR\', \'EDGE.KIND.LINK\', or \'EDGE.KIND.EMBED\'');
         return false;
       }
       this.checkLock();
@@ -457,7 +457,7 @@ export function Web<TBase extends Mixin>(Base: TBase) {
         console.warn(`target node with id "${targetID}" not found`);
         return false;
       }
-      if (kind === REL.REF.ATTR) {
+      if (kind === EDGE.KIND.ATTR) {
         if (sourceNode.attrs[type]?.size === 1) {
           delete sourceNode.attrs[type];
           return !Object.keys(sourceNode.attrs).includes(type);
@@ -465,7 +465,7 @@ export function Web<TBase extends Mixin>(Base: TBase) {
         sourceNode.attrs[type]?.delete(targetID);
         return !sourceNode.attrs[type]?.has(targetID);
       }
-      if (kind === REL.REF.LINK) {
+      if (kind === EDGE.KIND.LINK) {
         for (let i = 0; i < sourceNode.links.length; i++) {
           const l = sourceNode.links[i];
           if (l.id === targetID && l.type === type && l.header === header) {
@@ -477,7 +477,7 @@ export function Web<TBase extends Mixin>(Base: TBase) {
           link.type === type && link.id === targetID && link.header === header
         );
       }
-      if (kind === REL.REF.EMBED) {
+      if (kind === EDGE.KIND.EMBED) {
         for (let i = 0; i < sourceNode.embeds.length; i++) {
           const e = sourceNode.embeds[i];
           if (e.id === targetID && e.media === media && e.header === header) {
@@ -495,13 +495,13 @@ export function Web<TBase extends Mixin>(Base: TBase) {
     public retype(
       oldType: string,
       newType: string,
-      kind: REL.REF = REL.REF.REF,
+      kind: EDGE.KIND = EDGE.KIND.REF,
     ): boolean {
       this.checkLock();
       this.store.signal({ kind: 'web', op: 'retype' });
       const retypes: boolean[] = [];
       for (const node of (this.all({ payload: QUERY_TYPE.NODE }) as Node[] ?? [])) {
-        if ((kind === REL.REF.REF) || (kind === REL.REF.ATTR)) {
+        if ((kind === EDGE.KIND.REF) || (kind === EDGE.KIND.ATTR)) {
           if (Object.keys(node.attrs).includes(oldType)
           && !Object.keys(node.attrs).includes(newType)) {
             node.attrs[newType] = new Set(node.attrs[oldType]);
@@ -509,7 +509,7 @@ export function Web<TBase extends Mixin>(Base: TBase) {
             retypes.push(Object.keys(node.attrs).includes(newType));
           }
         }
-        if ((kind === REL.REF.REF) || (kind === REL.REF.LINK)) {
+        if ((kind === EDGE.KIND.REF) || (kind === EDGE.KIND.LINK)) {
           for (const l of node.links) {
             if (l.type === oldType) {
               l.type = newType;
@@ -524,7 +524,7 @@ export function Web<TBase extends Mixin>(Base: TBase) {
     public transfer(
       sourceID: string,
       targetID: string,
-      kind: REL.REF = REL.REF.REF,
+      kind: EDGE.KIND = EDGE.KIND.REF,
     ): boolean {
       this.checkLock();
       this.store.signal({ kind: 'web', op: 'transfer', id: sourceID });
@@ -542,7 +542,7 @@ export function Web<TBase extends Mixin>(Base: TBase) {
         console.warn(`target node with id "${targetID}" not in index`);
         return false;
       }
-      if ((kind === REL.REF.REF) || (kind === REL.REF.ATTR)) {
+      if ((kind === EDGE.KIND.REF) || (kind === EDGE.KIND.ATTR)) {
         for (const [key, val] of Object.entries(sourceNode.attrs)) {
           // create
           if (!Object.keys(targetNode.attrs).includes(key)) {
@@ -556,11 +556,11 @@ export function Web<TBase extends Mixin>(Base: TBase) {
         }
         sourceNode.attrs = {} as Attrs;
       }
-      if ((kind === REL.REF.REF) || (kind === REL.REF.LINK)) {
+      if ((kind === EDGE.KIND.REF) || (kind === EDGE.KIND.LINK)) {
         targetNode.links = targetNode.links.concat(sourceNode.links.filter((l) => l.id !== targetID));
         sourceNode.links = [] as Links;
       }
-      if ((kind === REL.REF.REF) || (kind === REL.REF.EMBED)) {
+      if ((kind === EDGE.KIND.REF) || (kind === EDGE.KIND.EMBED)) {
         targetNode.embeds = targetNode.embeds.concat(sourceNode.embeds.filter((e) => e.id !== targetID));
         sourceNode.embeds = [] as Embeds;
       }

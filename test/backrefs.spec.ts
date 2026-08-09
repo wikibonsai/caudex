@@ -4,7 +4,7 @@ import sinon from 'sinon';
 import nanoid from 'nanoid';
 
 import type { Attrs, Links } from '../src/types';
-import { Caudex, REL } from '../src/index';
+import { Caudex, EDGE } from '../src/index';
 
 
 // mechanism tests for the back-ref (inverse) index.
@@ -41,10 +41,10 @@ describe('back-ref index (mechanism)', () => {
   describe('rebuildBackRefsIndex() invariant', () => {
 
     it('an explicit rebuild yields the same back-views (deterministic derivation)', () => {
-      wb.connect('1', '2', REL.REF.LINK, 'linktype');
-      wb.connect('3', '2', REL.REF.LINK, 'linktype');
-      wb.connect('1', '2', REL.REF.ATTR, 'tags');
-      wb.connect('1', '2', REL.REF.EMBED);
+      wb.connect('1', '2', EDGE.KIND.LINK, 'linktype');
+      wb.connect('3', '2', EDGE.KIND.LINK, 'linktype');
+      wb.connect('1', '2', EDGE.KIND.ATTR, 'tags');
+      wb.connect('1', '2', EDGE.KIND.EMBED);
       const links = wb.backlinks('2');
       const attrs = wb.backattrs('2');
       const embeds = wb.backembeds('2');
@@ -61,7 +61,7 @@ describe('back-ref index (mechanism)', () => {
   describe('dirty / rebuild lifecycle', () => {
 
     it('rebuilds once, then serves from cache until a mutation', () => {
-      wb.connect('1', '2', REL.REF.LINK, 'linktype');
+      wb.connect('1', '2', EDGE.KIND.LINK, 'linktype');
       const spy = sinon.spy(wb, 'rebuildBackRefsIndex');
       // first query rebuilds (dirty after the connect)...
       wb.backlinks('2');
@@ -73,16 +73,16 @@ describe('back-ref index (mechanism)', () => {
     });
 
     it('every mutating op invalidates the cache (sets it dirty)', () => {
-      wb.connect('1', '2', REL.REF.LINK, 'linktype');
+      wb.connect('1', '2', EDGE.KIND.LINK, 'linktype');
       // each case: warm the cache (dirty -> false), mutate, expect dirty -> true.
       // asserted on the flag directly so it also covers clear() (which empties the
       // index, so a follow-up query would short-circuit before rebuilding).
       const cases: Array<[string, () => void]> = [
-        ['connect', () => wb.connect('3', '2', REL.REF.LINK, 'x')],
-        ['disconnect', () => wb.disconnect('3', '2', REL.REF.LINK, 'x')],
+        ['connect', () => wb.connect('3', '2', EDGE.KIND.LINK, 'x')],
+        ['disconnect', () => wb.disconnect('3', '2', EDGE.KIND.LINK, 'x')],
         ['transfer', () => wb.transfer('1', '4')],
-        ['retype', () => wb.retype('linktype', 'renamed', REL.REF.LINK)],
-        ['flushRelRefs', () => wb.flushRelRefs('4')],
+        ['retype', () => wb.retype('linktype', 'renamed', EDGE.KIND.LINK)],
+        ['flushWeb', () => wb.flushWeb('4')],
         ['add', () => wb.add({ uri: 'file://data/5', filename: 'five', title: 'Five' }, { id: '5' })],
         ['rm', () => wb.rm('5')],
         ['clear', () => wb.clear()],
@@ -115,8 +115,8 @@ describe('back-ref index (mechanism)', () => {
 
     it('lists referrers in index-insertion order regardless of connect order', () => {
       // connect 3 before 1; the result should still be [1, 3]
-      wb.connect('3', '2', REL.REF.LINK, 'linktype');
-      wb.connect('1', '2', REL.REF.LINK, 'linktype');
+      wb.connect('3', '2', EDGE.KIND.LINK, 'linktype');
+      wb.connect('1', '2', EDGE.KIND.LINK, 'linktype');
       assert.deepEqual(wb.backlinks('2'), [
         { type: 'linktype', id: '1' },
         { type: 'linktype', id: '3' },

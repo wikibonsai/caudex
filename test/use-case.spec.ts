@@ -4,7 +4,7 @@ import sinon from 'sinon';
 import nanoid from 'nanoid';
 
 import type { Attrs, Embeds, Links } from '../src/types';
-import { Caudex, Node, NODE, REL } from '../src/index';
+import { Caudex, Node, NODE, EDGE } from '../src/index';
 
 
 // use-case / workflow map
@@ -245,7 +245,7 @@ describe('use-case', () => {
 
     it('connects source -> target as a link', () => {
       // user types `[[two]]` inside `one.md`
-      assert.strictEqual(wb.connect('1', '2', REL.REF.LINK, 'linktype'), true);
+      assert.strictEqual(wb.connect('1', '2', EDGE.KIND.LINK, 'linktype'), true);
       // forelinks live on the source
       assert.deepEqual(wb.forelinks('1'), [{ type: 'linktype', id: '2' }] as Links);
       // backlinks are resolvable from the target
@@ -256,7 +256,7 @@ describe('use-case', () => {
 
     it('supports header-level links', () => {
       // `[[two#section]]`
-      assert.strictEqual(wb.connect('1', '2', { kind: REL.REF.LINK, type: 'linktype', header: 'section' }), true);
+      assert.strictEqual(wb.connect('1', '2', { kind: EDGE.KIND.LINK, type: 'linktype', header: 'section' }), true);
       assert.deepEqual(wb.backlinks('2'), [{ type: 'linktype', id: '1', header: 'section' }] as Links);
     });
 
@@ -265,9 +265,9 @@ describe('use-case', () => {
   describe('remove a wikilink between files', () => {
 
     it('disconnects the link', () => {
-      wb.connect('1', '2', REL.REF.LINK, 'linktype');
+      wb.connect('1', '2', EDGE.KIND.LINK, 'linktype');
       // user deletes the `[[two]]` text from `one.md`
-      assert.strictEqual(wb.disconnect('1', '2', REL.REF.LINK, 'linktype'), true);
+      assert.strictEqual(wb.disconnect('1', '2', EDGE.KIND.LINK, 'linktype'), true);
       assert.deepEqual(wb.forelinks('1'), [] as Links);
       assert.deepEqual(wb.backlinks('2'), [] as Links);
     });
@@ -289,21 +289,21 @@ describe('use-case', () => {
       // read backlinks BEFORE the new link exists...
       assert.deepEqual(wb.backlinks('2'), [] as Links);
       // ...user adds `[[two]]` in `one.md`...
-      wb.connect('1', '2', REL.REF.LINK, 'linktype');
+      wb.connect('1', '2', EDGE.KIND.LINK, 'linktype');
       // ...the re-read now includes it (no stale empty result)
       assert.deepEqual(wb.backlinks('2'), [{ type: 'linktype', id: '1' }] as Links);
     });
 
     it('a disconnected source drops out of a re-read of backlinks', () => {
-      wb.connect('1', '2', REL.REF.LINK, 'linktype');
-      wb.connect('3', '2', REL.REF.LINK, 'linktype');
+      wb.connect('1', '2', EDGE.KIND.LINK, 'linktype');
+      wb.connect('3', '2', EDGE.KIND.LINK, 'linktype');
       // read with both sources present...
       assert.deepEqual(wb.backlinks('2'), [
         { type: 'linktype', id: '1' },
         { type: 'linktype', id: '3' },
       ] as Links);
       // ...remove one...
-      wb.disconnect('1', '2', REL.REF.LINK, 'linktype');
+      wb.disconnect('1', '2', EDGE.KIND.LINK, 'linktype');
       // ...only the remaining source is reported
       assert.deepEqual(wb.backlinks('2'), [{ type: 'linktype', id: '3' }] as Links);
     });
@@ -322,8 +322,8 @@ describe('use-case', () => {
     it('backlinks lists every referrer, in index order', () => {
       // connect out of index order (3 before 1) to prove the result follows
       // index order, not connect order
-      wb.connect('3', '2', REL.REF.LINK, 'linktype');
-      wb.connect('1', '2', REL.REF.LINK, 'linktype');
+      wb.connect('3', '2', EDGE.KIND.LINK, 'linktype');
+      wb.connect('1', '2', EDGE.KIND.LINK, 'linktype');
       assert.deepEqual(wb.backlinks('2'), [
         { type: 'linktype', id: '1' },
         { type: 'linktype', id: '3' },
@@ -331,20 +331,20 @@ describe('use-case', () => {
     });
 
     it('backattrs aggregates every referrer of a type into one Set', () => {
-      wb.connect('1', '2', REL.REF.ATTR, 'tags');
-      wb.connect('3', '2', REL.REF.ATTR, 'tags');
+      wb.connect('1', '2', EDGE.KIND.ATTR, 'tags');
+      wb.connect('3', '2', EDGE.KIND.ATTR, 'tags');
       assert.deepEqual(wb.backattrs('2'), { tags: new Set(['1', '3']) } as Attrs);
     });
 
     it('backembeds lists every embedder, and clears when they are removed', () => {
-      wb.connect('1', '2', REL.REF.EMBED);
-      wb.connect('3', '2', REL.REF.EMBED);
+      wb.connect('1', '2', EDGE.KIND.EMBED);
+      wb.connect('3', '2', EDGE.KIND.EMBED);
       assert.deepEqual(wb.backembeds('2'), [
         { id: '1' },
         { id: '3' },
       ] as Embeds);
       // remove one embedder's refs (as an edit-body flush would)
-      wb.flushRelRefs('1');
+      wb.flushWeb('1');
       assert.deepEqual(wb.backembeds('2'), [{ id: '3' }] as Embeds);
     });
 
@@ -360,10 +360,10 @@ describe('use-case', () => {
   describe('neighbors span both directions and every ref kind', () => {
 
     it('unions outbound + inbound across link, attr, and embed', () => {
-      wb.connect('2', '3', REL.REF.LINK, 'linktype');  // 2 -> 3 (outbound link)
-      wb.connect('1', '2', REL.REF.LINK, 'linktype');  // 1 -> 2 (inbound link)
-      wb.connect('2', '4', REL.REF.ATTR, 'tags');      // 2 -> 4 (outbound attr)
-      wb.connect('1', '2', REL.REF.EMBED);             // 1 -> 2 (inbound embed)
+      wb.connect('2', '3', EDGE.KIND.LINK, 'linktype');  // 2 -> 3 (outbound link)
+      wb.connect('1', '2', EDGE.KIND.LINK, 'linktype');  // 1 -> 2 (inbound link)
+      wb.connect('2', '4', EDGE.KIND.ATTR, 'tags');      // 2 -> 4 (outbound attr)
+      wb.connect('1', '2', EDGE.KIND.EMBED);             // 1 -> 2 (inbound embed)
       // every counterpart, either direction, is a neighbor of `2`
       assert.deepEqual(new Set(wb.neighbors('2')), new Set(['1', '3', '4']));
     });
@@ -381,7 +381,7 @@ describe('use-case', () => {
 
     it('connects source -> target as a typed attr', () => {
       // `: tags :: [[two]]` inside `one.md`
-      assert.strictEqual(wb.connect('1', '2', REL.REF.ATTR, 'tags'), true);
+      assert.strictEqual(wb.connect('1', '2', EDGE.KIND.ATTR, 'tags'), true);
       assert.deepEqual(wb.foreattrs('1'), { tags: new Set(['2']) } as Attrs);
       assert.deepEqual(wb.backattrs('2'), { tags: new Set(['1']) } as Attrs);
     });
@@ -392,7 +392,7 @@ describe('use-case', () => {
 
     it('connects source -> target as an embed', () => {
       // `![[two]]` inside `one.md`
-      assert.strictEqual(wb.connect('1', '2', REL.REF.EMBED), true);
+      assert.strictEqual(wb.connect('1', '2', EDGE.KIND.EMBED), true);
       assert.deepEqual(wb.foreembeds('1'), [{ id: '2' }] as Embeds);
       assert.deepEqual(wb.backembeds('2'), [{ id: '1' }] as Embeds);
     });
@@ -405,7 +405,7 @@ describe('use-case', () => {
   // this is the primary incremental-update path in the real apps. when a file
   // is saved, its outgoing references are not diffed one-by-one -- instead the
   // node's title/headers are re-`edit()`ed, ALL of its forward refs are cleared
-  // with `flushRelRefs(id)`, and then the refs currently in the file are
+  // with `flushWeb(id)`, and then the refs currently in the file are
   // re-`connect()`ed. (see tendr-app caudex.ts updateFile + vscode-tendr
   // MarkdownProvider refreshRelRefs.) removing a link is therefore usually a
   // side effect of this flush+reconnect, not a standalone `disconnect()`.
@@ -415,12 +415,12 @@ describe('use-case', () => {
 
     it('rebuilds a node\'s forward refs to match the saved file', () => {
       // before: `one.md` linked `[[two]]`
-      wb.connect('1', '2', REL.REF.LINK, 'linktype');
+      wb.connect('1', '2', EDGE.KIND.LINK, 'linktype');
       // user saves `one.md` after swapping `[[two]]` for `[[three]]` + `: tags :: [[four]]`
       wb.edit('1', 'title', 'One (edited)');
-      assert.strictEqual(wb.flushRelRefs('1'), true);      // clear all old forward refs
-      wb.connect('1', '3', REL.REF.LINK, 'linktype');       // reconnect what the file now says
-      wb.connect('1', '4', REL.REF.ATTR, 'tags');
+      assert.strictEqual(wb.flushWeb('1'), true);      // clear all old forward refs
+      wb.connect('1', '3', EDGE.KIND.LINK, 'linktype');       // reconnect what the file now says
+      wb.connect('1', '4', EDGE.KIND.ATTR, 'tags');
       // the stale link is gone...
       assert.deepEqual(wb.backlinks('2'), [] as Links);
       // ...and the new refs are live in both directions
@@ -433,11 +433,11 @@ describe('use-case', () => {
       // `one.md` links `[[ghost]]` (a dangling link -> zombie)
       const zombie: Node | undefined = wb.add('ghost');
       if (!zombie) { assert.fail('expected a zombie node'); }
-      wb.connect('1', zombie.id, REL.REF.LINK, 'linktype');
+      wb.connect('1', zombie.id, EDGE.KIND.LINK, 'linktype');
       assert.deepEqual(wb.zombies(), [zombie.id]);
       // user saves `one.md` with the `[[ghost]]` link removed -> flush drops the
       // now-unreferenced zombie so it does not linger in the index
-      wb.flushRelRefs('1');
+      wb.flushWeb('1');
       assert.deepEqual(wb.zombies(), []);
       assert.strictEqual(wb.has(zombie.id), false);
     });
@@ -458,7 +458,7 @@ describe('use-case', () => {
 
     it('edits the node data in place; the node id is stable', () => {
       // `two` is linked from `one`
-      wb.connect('1', '2', REL.REF.LINK, 'linktype');
+      wb.connect('1', '2', EDGE.KIND.LINK, 'linktype');
       // user renames `two.md` -> `second.md`
       assert.strictEqual(wb.edit('2', 'filename', 'second'), true);
       assert.strictEqual(wb.edit('2', 'uri', 'file://data/second'), true);
@@ -469,7 +469,7 @@ describe('use-case', () => {
     });
 
     it('preserves backrefs across the rename (they point at the stable id)', () => {
-      wb.connect('1', '2', REL.REF.LINK, 'linktype');
+      wb.connect('1', '2', EDGE.KIND.LINK, 'linktype');
       assert.deepEqual(wb.backlinks('2'), [{ type: 'linktype', id: '1' }] as Links);
       // rename...
       wb.edit('2', 'filename', 'second');
@@ -489,8 +489,8 @@ describe('use-case', () => {
       // holds ghost's identity and its inbound backlink.
       const zombie: Node | undefined = wb.add('ghost');
       if (!zombie) { assert.fail('expected a zombie node'); }
-      wb.connect('1', zombie.id, REL.REF.LINK, 'linktype'); // one -> [[ghost]]
-      wb.connect('2', '3', REL.REF.LINK, 'mentions');       // two -> [[three]]
+      wb.connect('1', zombie.id, EDGE.KIND.LINK, 'linktype'); // one -> [[ghost]]
+      wb.connect('2', '3', EDGE.KIND.LINK, 'mentions');       // two -> [[three]]
       // user renames `two.md` -> `ghost.md`. rather than orphan the pre-existing
       // `[[ghost]]` backlink, the real doc is folded INTO the zombie (which keeps
       // its id, and therefore its inbound refs). (see vscode-tendr handleRename.)
@@ -520,10 +520,10 @@ describe('use-case', () => {
   describe('rename a reftype across the vault', () => {
 
     it('retypes an attr key everywhere it appears', () => {
-      wb.connect('1', '2', REL.REF.ATTR, 'tags');
-      wb.connect('3', '2', REL.REF.ATTR, 'tags');
+      wb.connect('1', '2', EDGE.KIND.ATTR, 'tags');
+      wb.connect('3', '2', EDGE.KIND.ATTR, 'tags');
       // user renames the caml key `tags` -> `topics` project-wide
-      assert.strictEqual(wb.retype('tags', 'topics', REL.REF.ATTR), true);
+      assert.strictEqual(wb.retype('tags', 'topics', EDGE.KIND.ATTR), true);
       assert.deepEqual(wb.foreattrs('1'), { topics: new Set(['2']) } as Attrs);
       assert.deepEqual(wb.foreattrs('3'), { topics: new Set(['2']) } as Attrs);
       assert.deepEqual([...wb.attrtypes()], ['topics']);
@@ -532,8 +532,8 @@ describe('use-case', () => {
     });
 
     it('retypes a link type everywhere it appears', () => {
-      wb.connect('1', '2', REL.REF.LINK, 'rel');
-      assert.strictEqual(wb.retype('rel', 'relates', REL.REF.LINK), true);
+      wb.connect('1', '2', EDGE.KIND.LINK, 'rel');
+      assert.strictEqual(wb.retype('rel', 'relates', EDGE.KIND.LINK), true);
       assert.deepEqual(wb.forelinks('1'), [{ type: 'relates', id: '2' }] as Links);
       // the back-view carries the new type
       assert.deepEqual(wb.backlinks('2'), [{ type: 'relates', id: '1' }] as Links);
@@ -563,7 +563,7 @@ describe('use-case', () => {
       const zombie: Node | undefined = wb.add('ghost');
       if (!zombie) { assert.fail('expected a zombie node'); }
       assert.strictEqual(zombie.kind, NODE.KIND.ZOMBIE);
-      wb.connect('1', zombie.id, REL.REF.LINK, 'linktype');
+      wb.connect('1', zombie.id, EDGE.KIND.LINK, 'linktype');
       // the zombie is tracked and carries the backref
       assert.deepEqual(wb.zombies(), [zombie.id]);
       assert.deepEqual(wb.backlinks(zombie.id), [{ type: 'linktype', id: '1' }] as Links);
@@ -576,7 +576,7 @@ describe('use-case', () => {
     it('fills the zombie in place; the id and its backrefs are preserved', () => {
       const zombie: Node | undefined = wb.add('ghost');
       if (!zombie) { assert.fail('expected a zombie node'); }
-      wb.connect('1', zombie.id, REL.REF.LINK, 'linktype');
+      wb.connect('1', zombie.id, EDGE.KIND.LINK, 'linktype');
       // user creates `ghost.md`: fill the existing zombie rather than adding anew,
       // so the pre-existing backref survives (same id).
       const filled: Node | undefined = wb.fill(zombie.id, {
@@ -615,7 +615,7 @@ describe('use-case', () => {
       // detach `two` from the tree first so the only thing holding it is the link
       wb.prune('2', '4');       // make `two` a leaf
       wb.prune('1', '2');       // remove `two` from the index
-      wb.connect('1', '2', REL.REF.LINK, 'linktype'); // `one` still links to `two`
+      wb.connect('1', '2', EDGE.KIND.LINK, 'linktype'); // `one` still links to `two`
       // user deletes `two.md`
       assert.strictEqual(wb.rm('2'), true);
       // the node survives as a zombie so the backlink is not orphaned
@@ -644,8 +644,8 @@ describe('use-case', () => {
 
     it('transfers the source\'s outgoing refs onto the target', () => {
       // `two` links to `three` and has a `tags` attr to `four`
-      wb.connect('2', '3', REL.REF.LINK, 'linktype');
-      wb.connect('2', '4', REL.REF.ATTR, 'tags');
+      wb.connect('2', '3', EDGE.KIND.LINK, 'linktype');
+      wb.connect('2', '4', EDGE.KIND.ATTR, 'tags');
       // user merges `two.md` into `one.md`: move two's outgoing refs onto one
       assert.strictEqual(wb.transfer('2', '1'), true);
       // one now owns two's former references...
@@ -681,14 +681,14 @@ describe('use-case', () => {
 
     it('lists isolates -- docs with no references at all', () => {
       // link `one` -> `two`; the rest remain unreferenced in the web
-      wb.connect('1', '2', REL.REF.LINK, 'linktype');
+      wb.connect('1', '2', EDGE.KIND.LINK, 'linktype');
       assert.deepEqual(wb.isolates(), ['3', '4']);
     });
 
     it('lists zombies -- dangling links to files that do not exist', () => {
       const zombie: Node | undefined = wb.add('ghost');
       if (!zombie) { assert.fail('expected a zombie node'); }
-      wb.connect('1', zombie.id, REL.REF.LINK, 'linktype');
+      wb.connect('1', zombie.id, EDGE.KIND.LINK, 'linktype');
       assert.deepEqual(wb.zombies(), [zombie.id]);
     });
 
@@ -701,7 +701,7 @@ describe('use-case', () => {
     it('orphan but NOT isolate: dropped from the index, yet still web-linked', () => {
       // prune `four` out of the index, but `one` still links to it
       wb.prune('2', '4');
-      wb.connect('1', '4', REL.REF.LINK, 'linktype');
+      wb.connect('1', '4', EDGE.KIND.LINK, 'linktype');
       const ids = wb.all() as string[];
       // TREE axis: not in any index -> orphan
       assert.ok((wb.orphans(ids) as string[]).includes('4'));
@@ -711,8 +711,8 @@ describe('use-case', () => {
 
     it('isolate but NOT orphan: in the index, yet referenced by nothing', () => {
       // give the other nodes web refs; `four` stays a tree leaf with no refs
-      wb.connect('1', '2', REL.REF.LINK, 'linktype');
-      wb.connect('3', '1', REL.REF.LINK, 'linktype');
+      wb.connect('1', '2', EDGE.KIND.LINK, 'linktype');
+      wb.connect('3', '1', EDGE.KIND.LINK, 'linktype');
       const ids = wb.all() as string[];
       // WEB axis: no refs to or from it -> isolate
       assert.ok((wb.isolates() as string[]).includes('4'));
@@ -730,7 +730,7 @@ describe('use-case', () => {
     it('zombie: counted as NEITHER an orphan nor an isolate', () => {
       const zombie: Node | undefined = wb.add('ghost');
       if (!zombie) { assert.fail('expected a zombie node'); }
-      wb.connect('1', zombie.id, REL.REF.LINK, 'linktype');
+      wb.connect('1', zombie.id, EDGE.KIND.LINK, 'linktype');
       const ids = wb.all() as string[];
       assert.deepEqual(wb.zombies(), [zombie.id]);
       // caudex excludes zombies from both reckonings (file-existence is its own axis)

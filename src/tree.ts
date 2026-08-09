@@ -288,12 +288,12 @@ export function Tree<TBase extends Mixin>(Base: TBase) {
 
     // methods
 
-    public flushRelFams(): boolean {
+    public flushTree(): boolean {
       this.checkLock();
       // flushing tree relations strands every child→parent edge → signal a
       // tree-kind change. (It does NOT touch web attr/link/embed data, so it must
       // NOT stale backRefsIndex — tree-kind leaves web-scoped indexes alone.)
-      this.store.signal({ kind: 'tree', op: 'flushRelFams' });
+      this.store.signal({ kind: 'tree', op: 'flushTree' });
       for (const node of (this.all({ payload: QUERY_TYPE.NODE }) as Node[] ?? [])) {
         const isZombie: boolean = (node.kind === NODE.KIND.ZOMBIE);
         /* eslint-disable indent */

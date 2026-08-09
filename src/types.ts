@@ -1,4 +1,4 @@
-import { NODE, REL, QUERY_TYPE } from './const';
+import { NODE, EDGE, QUERY_TYPE } from './const';
 import { Base } from './base';
 
 
@@ -102,10 +102,10 @@ export interface BackRefs {
 // query system
 
 export interface FilterOpts {
-  level?: REL.LEVEL;
+  level?: EDGE.LEVEL;
   filename?: string;
   header?: string;
-  kind?: REL.REF;
+  kind?: EDGE.KIND;
   type?: string;
   nodeKind?: NODE.KIND;
   nodeType?: string;
@@ -125,7 +125,7 @@ export interface QueryOpts {
 // mutation options
 
 export interface ConnectOpts {
-  kind: REL.REF;
+  kind: EDGE.KIND;
   type?: string;
   header?: string;
   media?: NODE.MEDIA;

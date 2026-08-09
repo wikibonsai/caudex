@@ -1126,7 +1126,7 @@ describe('tree', () => {
 
     describe('tree lvl', () => {
 
-      describe('flushRelFams()', () => {
+      describe('flushTree()', () => {
 
         it('clears tree relationship refs', () => {
           // setup
@@ -1138,7 +1138,7 @@ describe('tree', () => {
           assert.deepEqual(testNode1.children, ['2']);
           assert.deepEqual(testNode2.children, ['3', '4']);
           // exec
-          assert.strictEqual(bonsai.flushRelFams(), true);
+          assert.strictEqual(bonsai.flushTree(), true);
           // test
           assert.deepEqual(testNode1.children, []);
           assert.deepEqual(testNode2.children, []);

@@ -3,7 +3,7 @@ import sinon from 'sinon';
 
 import nanoid from 'nanoid';
 
-import { NODE, REL } from '../src/const';
+import { NODE, EDGE } from '../src/const';
 import { Base } from '../src/base';
 import { Node } from '../src/node';
 import { Tree } from '../src/tree';
@@ -380,7 +380,7 @@ describe('async mutex locking', () => {
         return lockyWiki.lock.acquire()
                           .then(async (release: any) => {
                             await new Promise((resolve) => setTimeout(resolve, 1000));
-                            const connectedNode: Node | undefined = lockyWiki.connect('1', '2', REL.REF.ATTR, 'attrtype');
+                            const connectedNode: Node | undefined = lockyWiki.connect('1', '2', EDGE.KIND.ATTR, 'attrtype');
                             release();
                             return (connectedNode !== undefined);
                           });

@@ -4,9 +4,9 @@ import { Node } from './node';
 // typed change events -- the semantic layer signals WHAT changed; the store
 // routes the signal to (a) scoped derived-index invalidation and (b) external
 // subscribers. Kinds mirror the consumer's revision axes:
-//   'node' -- the node set changed (add/rm/fill/flushRels/clear); all indexes stale.
-//   'tree' -- the hierarchy changed (graft/prune/replace/transplant/flushRelFams).
-//   'web'  -- the relations changed (connect/disconnect/retype/transfer/flushRelRefs).
+//   'node' -- the node set changed (add/rm/fill/flushGraph/clear); all indexes stale.
+//   'tree' -- the hierarchy changed (graft/prune/replace/transplant/flushTree).
+//   'web'  -- the relations changed (connect/disconnect/retype/transfer/flushWeb).
 // Content-only ops (edit/flushData) do NOT signal -- they invalidate nothing
 // today, and emitting on them would over-invalidate scoped indexes.
 export type ChangeKind = 'node' | 'tree' | 'web';
@@ -100,7 +100,7 @@ export class DerivedIndex<T> {
 // in the core, which sequences these primitives exactly as 'Base' used to inline
 // them. Note in particular that 'delete()' and 'clear()' do NOT touch the key
 // map -- de-indexing is an explicit, separate op ('deindexKey'), because some
-// core paths (e.g. zombie deletion in 'flushRels') intentionally leave entries.
+// core paths (e.g. zombie deletion in 'flushGraph') intentionally leave entries.
 //
 // truly-private fields are possible here -- unlike in the mixin chain
 // (see base.ts) -- because NodeStore stands outside it.

@@ -217,9 +217,9 @@ export class Base {
     }
   }
 
-  public flushRels(): boolean {
+  public flushGraph(): boolean {
     this.checkLock();
-    this.onMutate('flushRels');
+    this.onMutate('flushGraph');
     for (const node of (this.all({ payload: QUERY_TYPE.NODE }) as Node[] ?? [])) {
       // delete zombies
       if (node.kind === NODE.KIND.ZOMBIE) {

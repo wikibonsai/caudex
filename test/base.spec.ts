@@ -828,7 +828,7 @@ describe('base', () => {
 
       });
 
-      describe('flushRels()', () => {
+      describe('flushGraph()', () => {
 
         it('clears relationship refs', () => {
           // setup
@@ -870,7 +870,7 @@ describe('base', () => {
             type: NODE.TYPE.DEFAULT,
           }]);
           // exec
-          assert.strictEqual(base.flushRels(), true);
+          assert.strictEqual(base.flushGraph(), true);
           // test
           // 1
           assert.deepEqual(testNode1.attrs, {});

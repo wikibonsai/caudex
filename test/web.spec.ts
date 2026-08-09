@@ -4,8 +4,8 @@ import sinon from 'sinon';
 import nanoid from 'nanoid';
 
 import type { Attrs, Embeds, Links } from '../src/types';
-import { NODE, QUERY_TYPE, REL } from '../src/const';
-const { LEVEL } = REL;
+import { NODE, QUERY_TYPE, EDGE } from '../src/const';
+const { LEVEL } = EDGE;
 import { Node } from '../src/node';
 import { Base } from '../src/base';
 import { Web } from '../src/web';
@@ -130,9 +130,9 @@ describe('web', () => {
       });
 
       it('index has no isolates', () => {
-        wiki.connect('1', '2', REL.REF.LINK, 'link');
-        wiki.connect('1', '3', REL.REF.LINK, 'link');
-        wiki.connect('1', '4', REL.REF.LINK, 'link');
+        wiki.connect('1', '2', EDGE.KIND.LINK, 'link');
+        wiki.connect('1', '3', EDGE.KIND.LINK, 'link');
+        wiki.connect('1', '4', EDGE.KIND.LINK, 'link');
         assert.deepEqual(wiki.isolates(), []);
       });
 
@@ -240,34 +240,34 @@ describe('web', () => {
       });
 
       it('filter.level FILE returns only file-level links', () => {
-        wiki.connect('1', '2', { kind: REL.REF.LINK, type: 't' });
-        wiki.connect('1', '2', { kind: REL.REF.LINK, type: 't', header: 's1' });
-        wiki.connect('1', '2', { kind: REL.REF.LINK, type: 't', header: 's2' });
+        wiki.connect('1', '2', { kind: EDGE.KIND.LINK, type: 't' });
+        wiki.connect('1', '2', { kind: EDGE.KIND.LINK, type: 't', header: 's1' });
+        wiki.connect('1', '2', { kind: EDGE.KIND.LINK, type: 't', header: 's2' });
         const out = wiki.forelinks('1', { filter: { level: LEVEL.FILE } });
         assert.strictEqual(out.length, 1);
         assert.strictEqual(out[0].header, undefined);
       });
 
       it('filter.level HEADER returns only header-level links', () => {
-        wiki.connect('1', '2', { kind: REL.REF.LINK, type: 't' });
-        wiki.connect('1', '2', { kind: REL.REF.LINK, type: 't', header: 's1' });
-        wiki.connect('1', '2', { kind: REL.REF.LINK, type: 't', header: 's2' });
+        wiki.connect('1', '2', { kind: EDGE.KIND.LINK, type: 't' });
+        wiki.connect('1', '2', { kind: EDGE.KIND.LINK, type: 't', header: 's1' });
+        wiki.connect('1', '2', { kind: EDGE.KIND.LINK, type: 't', header: 's2' });
         const out = wiki.forelinks('1', { filter: { level: LEVEL.HEADER } });
         assert.strictEqual(out.length, 2);
         assert.strictEqual(out.every((l: any) => l.header), true);
       });
 
       it('filter.header returns only matching header', () => {
-        wiki.connect('1', '2', { kind: REL.REF.LINK, type: 't', header: 's1' });
-        wiki.connect('1', '2', { kind: REL.REF.LINK, type: 't', header: 's2' });
+        wiki.connect('1', '2', { kind: EDGE.KIND.LINK, type: 't', header: 's1' });
+        wiki.connect('1', '2', { kind: EDGE.KIND.LINK, type: 't', header: 's2' });
         const out = wiki.forelinks('1', { filter: { header: 's1' } });
         assert.strictEqual(out.length, 1);
         assert.strictEqual(out[0].header, 's1');
       });
 
       it('backlinks filter.level FILE', () => {
-        wiki.connect('1', '2', { kind: REL.REF.LINK, type: 't' });
-        wiki.connect('1', '2', { kind: REL.REF.LINK, type: 't', header: 's1' });
+        wiki.connect('1', '2', { kind: EDGE.KIND.LINK, type: 't' });
+        wiki.connect('1', '2', { kind: EDGE.KIND.LINK, type: 't', header: 's1' });
         const out = wiki.backlinks('2', { filter: { level: LEVEL.FILE } });
         assert.strictEqual(out.length, 1);
         assert.strictEqual(out[0].header, undefined);
@@ -344,25 +344,25 @@ describe('web', () => {
       });
 
       it('filter.level FILE returns only file-level embeds', () => {
-        wiki.connect('1', '2', { kind: REL.REF.EMBED });
-        wiki.connect('1', '2', { kind: REL.REF.EMBED, header: 'a' });
-        wiki.connect('1', '2', { kind: REL.REF.EMBED, header: 'b' });
+        wiki.connect('1', '2', { kind: EDGE.KIND.EMBED });
+        wiki.connect('1', '2', { kind: EDGE.KIND.EMBED, header: 'a' });
+        wiki.connect('1', '2', { kind: EDGE.KIND.EMBED, header: 'b' });
         const out = wiki.foreembeds('1', { filter: { level: LEVEL.FILE } });
         assert.strictEqual(out.length, 1);
         assert.strictEqual(out[0].header, undefined);
       });
 
       it('filter.level HEADER returns only header-level embeds', () => {
-        wiki.connect('1', '2', { kind: REL.REF.EMBED });
-        wiki.connect('1', '2', { kind: REL.REF.EMBED, header: 'a' });
-        wiki.connect('1', '2', { kind: REL.REF.EMBED, header: 'b' });
+        wiki.connect('1', '2', { kind: EDGE.KIND.EMBED });
+        wiki.connect('1', '2', { kind: EDGE.KIND.EMBED, header: 'a' });
+        wiki.connect('1', '2', { kind: EDGE.KIND.EMBED, header: 'b' });
         const out = wiki.foreembeds('1', { filter: { level: LEVEL.HEADER } });
         assert.strictEqual(out.length, 2);
       });
 
       it('filter.header returns only matching embed', () => {
-        wiki.connect('1', '2', { kind: REL.REF.EMBED, header: 'a' });
-        wiki.connect('1', '2', { kind: REL.REF.EMBED, header: 'b' });
+        wiki.connect('1', '2', { kind: EDGE.KIND.EMBED, header: 'a' });
+        wiki.connect('1', '2', { kind: EDGE.KIND.EMBED, header: 'b' });
         const out = wiki.foreembeds('1', { filter: { header: 'a' } });
         assert.strictEqual(out.length, 1);
         assert.strictEqual(out[0].header, 'a');
@@ -448,10 +448,10 @@ describe('web', () => {
         wiki.index['1'].embeds.push({
           id: '4',
         });
-        assert.deepEqual(wiki.neighbors('1', REL.REF.ATTR), ['2']);
-        assert.deepEqual(wiki.neighbors('2', REL.REF.ATTR), ['1']);
-        assert.deepEqual(wiki.neighbors('3', REL.REF.ATTR), []);
-        assert.deepEqual(wiki.neighbors('4', REL.REF.ATTR), []);
+        assert.deepEqual(wiki.neighbors('1', EDGE.KIND.ATTR), ['2']);
+        assert.deepEqual(wiki.neighbors('2', EDGE.KIND.ATTR), ['1']);
+        assert.deepEqual(wiki.neighbors('3', EDGE.KIND.ATTR), []);
+        assert.deepEqual(wiki.neighbors('4', EDGE.KIND.ATTR), []);
       });
 
       it('node exists; filter; link', () => {
@@ -464,10 +464,10 @@ describe('web', () => {
         wiki.index['1'].embeds.push({
           id: '4',
         });
-        assert.deepEqual(wiki.neighbors('1', REL.REF.LINK), ['3']);
-        assert.deepEqual(wiki.neighbors('2', REL.REF.LINK), []);
-        assert.deepEqual(wiki.neighbors('3', REL.REF.LINK), ['1']);
-        assert.deepEqual(wiki.neighbors('4', REL.REF.LINK), []);
+        assert.deepEqual(wiki.neighbors('1', EDGE.KIND.LINK), ['3']);
+        assert.deepEqual(wiki.neighbors('2', EDGE.KIND.LINK), []);
+        assert.deepEqual(wiki.neighbors('3', EDGE.KIND.LINK), ['1']);
+        assert.deepEqual(wiki.neighbors('4', EDGE.KIND.LINK), []);
       });
 
       it('node exists; filter; embed', () => {
@@ -480,10 +480,10 @@ describe('web', () => {
         wiki.index['1'].embeds.push({
           id: '4',
         });
-        // assert.deepEqual(wiki.neighbors('1', REL.REF.EMBED), ['4']);
-        // assert.deepEqual(wiki.neighbors('2', REL.REF.EMBED), []);
-        // assert.deepEqual(wiki.neighbors('3', REL.REF.EMBED), []);
-        assert.deepEqual(wiki.neighbors('4', REL.REF.EMBED), ['1']);
+        // assert.deepEqual(wiki.neighbors('1', EDGE.KIND.EMBED), ['4']);
+        // assert.deepEqual(wiki.neighbors('2', EDGE.KIND.EMBED), []);
+        // assert.deepEqual(wiki.neighbors('3', EDGE.KIND.EMBED), []);
+        assert.deepEqual(wiki.neighbors('4', EDGE.KIND.EMBED), ['1']);
       });
 
       it('node does not exist', () => {
@@ -497,9 +497,9 @@ describe('web', () => {
       describe('filter', () => {
 
         it('forelinks/backlinks filter.type returns only matching link type', () => {
-          wiki.connect('1', '2', { kind: REL.REF.LINK, type: 'is-a' });
-          wiki.connect('1', '2', { kind: REL.REF.LINK, type: 'tagged' });
-          wiki.connect('1', '3', { kind: REL.REF.LINK, type: 'is-a' });
+          wiki.connect('1', '2', { kind: EDGE.KIND.LINK, type: 'is-a' });
+          wiki.connect('1', '2', { kind: EDGE.KIND.LINK, type: 'tagged' });
+          wiki.connect('1', '3', { kind: EDGE.KIND.LINK, type: 'is-a' });
           assert.strictEqual(wiki.forelinks('1').length, 3);
           const isaLinks = wiki.forelinks('1', { filter: { type: 'is-a' } });
           assert.strictEqual(isaLinks.length, 2);
@@ -515,8 +515,8 @@ describe('web', () => {
         it('neighbors with filter kind', () => {
           wiki.index['1'].attrs['a'] = new Set(['2']);
           wiki.index['1'].links.push({ type: 't', id: '3' });
-          assert.deepEqual(wiki.neighbors('1', { filter: { kind: REL.REF.ATTR } }), ['2']);
-          assert.deepEqual(wiki.neighbors('1', { filter: { kind: REL.REF.LINK } }), ['3']);
+          assert.deepEqual(wiki.neighbors('1', { filter: { kind: EDGE.KIND.ATTR } }), ['2']);
+          assert.deepEqual(wiki.neighbors('1', { filter: { kind: EDGE.KIND.LINK } }), ['3']);
         });
 
         it('isolates with filter: filter not applied to isolate set; full list returned', () => {
@@ -528,8 +528,8 @@ describe('web', () => {
 
         it('neighbors with filter (non-kind): only filter.kind is used; other filter fields ignored', () => {
           wiki.index['1'].links.push({ type: 't', id: '2' });
-          const withKind = wiki.neighbors('1', { filter: { kind: REL.REF.LINK } });
-          const withKindAndFilename = wiki.neighbors('1', { filter: { kind: REL.REF.LINK, filename: 'one' } });
+          const withKind = wiki.neighbors('1', { filter: { kind: EDGE.KIND.LINK } });
+          const withKindAndFilename = wiki.neighbors('1', { filter: { kind: EDGE.KIND.LINK, filename: 'one' } });
           assert.deepEqual(withKindAndFilename, withKind, 'filter.filename (and other non-kind fields) are ignored');
         });
 
@@ -553,7 +553,7 @@ describe('web', () => {
         });
 
         it('forelinks with payload node', () => {
-          wiki.connect('1', '2', { kind: REL.REF.LINK, type: 't' });
+          wiki.connect('1', '2', { kind: EDGE.KIND.LINK, type: 't' });
           const out = wiki.forelinks('1', { payload: QUERY_TYPE.NODE }) as [any, Node][];
           assert.strictEqual(out.length, 1);
           assert.strictEqual(out[0][0], 't');
@@ -561,13 +561,13 @@ describe('web', () => {
         });
 
         it('forelinks with payload single key', () => {
-          wiki.connect('1', '2', { kind: REL.REF.LINK, type: 't' });
+          wiki.connect('1', '2', { kind: EDGE.KIND.LINK, type: 't' });
           const out = wiki.forelinks('1', { payload: 'filename' }) as [any, string][];
           assert.deepEqual(out, [['t', 'two']]);
         });
 
         it('backlinks with payload string[]', () => {
-          wiki.connect('1', '2', { kind: REL.REF.LINK, type: 't' });
+          wiki.connect('1', '2', { kind: EDGE.KIND.LINK, type: 't' });
           const out = wiki.backlinks('2', { payload: ['id', 'filename'] }) as [any, any][];
           assert.strictEqual(out.length, 1);
           assert.strictEqual(out[0][0], 't');
@@ -575,7 +575,7 @@ describe('web', () => {
         });
 
         it('foreembeds with payload id (default)', () => {
-          wiki.connect('1', '2', { kind: REL.REF.EMBED });
+          wiki.connect('1', '2', { kind: EDGE.KIND.EMBED });
           assert.deepEqual(wiki.foreembeds('1'), [{ id: '2' }]);
         });
 
@@ -590,8 +590,8 @@ describe('web', () => {
       describe('filter + payload combined', () => {
 
         it('forelinks filter.level and payload', () => {
-          wiki.connect('1', '2', { kind: REL.REF.LINK, type: 't' });
-          wiki.connect('1', '2', { kind: REL.REF.LINK, type: 't', header: 's1' });
+          wiki.connect('1', '2', { kind: EDGE.KIND.LINK, type: 't' });
+          wiki.connect('1', '2', { kind: EDGE.KIND.LINK, type: 't', header: 's1' });
           const fileLevel = wiki.forelinks('1', { filter: { level: LEVEL.FILE }, payload: 'filename' }) as [any, string][];
           assert.strictEqual(fileLevel.length, 1);
           assert.strictEqual(fileLevel[0][1], 'two');
@@ -605,10 +605,10 @@ describe('web', () => {
       describe('links', () => {
 
         beforeEach(() => {
-          wiki.connect('1', '2', { kind: REL.REF.LINK, type: 'cite' });
-          wiki.connect('1', '2', { kind: REL.REF.LINK, type: 'cite', header: 'intro' });
-          wiki.connect('1', '3', { kind: REL.REF.LINK, type: 'see-also' });
-          wiki.connect('1', '3', { kind: REL.REF.LINK, type: 'see-also', header: 'body' });
+          wiki.connect('1', '2', { kind: EDGE.KIND.LINK, type: 'cite' });
+          wiki.connect('1', '2', { kind: EDGE.KIND.LINK, type: 'cite', header: 'intro' });
+          wiki.connect('1', '3', { kind: EDGE.KIND.LINK, type: 'see-also' });
+          wiki.connect('1', '3', { kind: EDGE.KIND.LINK, type: 'see-also', header: 'body' });
         });
 
         it('forelinks filter type', () => {
@@ -661,9 +661,9 @@ describe('web', () => {
       describe('embeds', () => {
 
         beforeEach(() => {
-          wiki.connect('1', '2', { kind: REL.REF.EMBED });
-          wiki.connect('1', '2', { kind: REL.REF.EMBED, header: 'intro' });
-          wiki.connect('3', '2', { kind: REL.REF.EMBED, header: 'body' });
+          wiki.connect('1', '2', { kind: EDGE.KIND.EMBED });
+          wiki.connect('1', '2', { kind: EDGE.KIND.EMBED, header: 'intro' });
+          wiki.connect('3', '2', { kind: EDGE.KIND.EMBED, header: 'body' });
         });
 
         it('backembeds filter level file', () => {
@@ -694,31 +694,31 @@ describe('web', () => {
       describe('connect disconnect roundtrips', () => {
 
         it('link header roundtrip', () => {
-          assert.strictEqual(wiki.connect('1', '2', { kind: REL.REF.LINK, type: 't', header: 'h1' }), true);
+          assert.strictEqual(wiki.connect('1', '2', { kind: EDGE.KIND.LINK, type: 't', header: 'h1' }), true);
           let out = wiki.forelinks('1', { filter: { header: 'h1' } });
           assert.strictEqual(out.length, 1);
           assert.strictEqual(out[0].header, 'h1');
           out = wiki.backlinks('2', { filter: { header: 'h1' } });
           assert.strictEqual(out.length, 1);
-          assert.strictEqual(wiki.disconnect('1', '2', { kind: REL.REF.LINK, type: 't', header: 'h1' }), true);
+          assert.strictEqual(wiki.disconnect('1', '2', { kind: EDGE.KIND.LINK, type: 't', header: 'h1' }), true);
           assert.deepEqual(wiki.forelinks('1', { filter: { header: 'h1' } }), []);
         });
 
         it('embed header roundtrip', () => {
-          assert.strictEqual(wiki.connect('1', '2', { kind: REL.REF.EMBED, header: 'h1' }), true);
+          assert.strictEqual(wiki.connect('1', '2', { kind: EDGE.KIND.EMBED, header: 'h1' }), true);
           let out = wiki.foreembeds('1', { filter: { header: 'h1' } });
           assert.strictEqual(out.length, 1);
           assert.strictEqual(out[0].header, 'h1');
           out = wiki.backembeds('2', { filter: { header: 'h1' } });
           assert.strictEqual(out.length, 1);
-          assert.strictEqual(wiki.disconnect('1', '2', { kind: REL.REF.EMBED, header: 'h1' }), true);
+          assert.strictEqual(wiki.disconnect('1', '2', { kind: EDGE.KIND.EMBED, header: 'h1' }), true);
           assert.deepEqual(wiki.foreembeds('1', { filter: { header: 'h1' } }), []);
         });
 
         it('connect file and header disconnect only header', () => {
-          wiki.connect('1', '2', { kind: REL.REF.LINK, type: 't' });
-          wiki.connect('1', '2', { kind: REL.REF.LINK, type: 't', header: 's1' });
-          assert.strictEqual(wiki.disconnect('1', '2', { kind: REL.REF.LINK, type: 't', header: 's1' }), true);
+          wiki.connect('1', '2', { kind: EDGE.KIND.LINK, type: 't' });
+          wiki.connect('1', '2', { kind: EDGE.KIND.LINK, type: 't', header: 's1' });
+          assert.strictEqual(wiki.disconnect('1', '2', { kind: EDGE.KIND.LINK, type: 't', header: 's1' }), true);
           const out = wiki.forelinks('1', { filter: { level: LEVEL.FILE } });
           assert.strictEqual(out.length, 1);
           assert.strictEqual(out[0].header, undefined);
@@ -726,7 +726,7 @@ describe('web', () => {
 
         it('connect attr with header throws', () => {
           assert.throws(
-            () => wiki.connect('1', '2', { kind: REL.REF.ATTR, type: 't', header: 'h' }),
+            () => wiki.connect('1', '2', { kind: EDGE.KIND.ATTR, type: 't', header: 'h' }),
             /attrs do not support headers/
           );
         });
@@ -748,18 +748,18 @@ describe('web', () => {
           wiki.index['1'].attrs['a'] = new Set(['2']);
           wiki.index['1'].links.push({ type: 't', id: '3' });
           wiki.index['1'].embeds.push({ id: '4' });
-          assert.deepEqual(wiki.neighbors('1', { filter: { kind: REL.REF.LINK } }), ['3']);
+          assert.deepEqual(wiki.neighbors('1', { filter: { kind: EDGE.KIND.LINK } }), ['3']);
         });
 
         it('neighbors filter by kind attr', () => {
           wiki.index['1'].attrs['a'] = new Set(['2']);
           wiki.index['1'].links.push({ type: 't', id: '3' });
-          assert.deepEqual(wiki.neighbors('1', { filter: { kind: REL.REF.ATTR } }), ['2']);
+          assert.deepEqual(wiki.neighbors('1', { filter: { kind: EDGE.KIND.ATTR } }), ['2']);
         });
 
         it('neighbors filter by kind embed', () => {
           wiki.index['1'].embeds.push({ id: '2' });
-          assert.deepEqual(wiki.neighbors('1', { filter: { kind: REL.REF.EMBED } }), ['2']);
+          assert.deepEqual(wiki.neighbors('1', { filter: { kind: EDGE.KIND.EMBED } }), ['2']);
         });
       });
 
@@ -784,7 +784,7 @@ describe('web', () => {
 
   describe('methods', () => {
 
-    describe('flushRelRefs()', () => {
+    describe('flushWeb()', () => {
 
       it('all; flush refs; delete zombies with no refs', () => {
         // before
@@ -830,7 +830,7 @@ describe('web', () => {
         }]);
         assert.deepEqual(wiki.zombies().length, 1);
         // flush
-        assert.deepEqual(wiki.flushRelRefs(), true);
+        assert.deepEqual(wiki.flushWeb(), true);
         // after flush
         assert.deepEqual(wiki.foreattrs('1'), {});
         assert.deepEqual(wiki.backattrs('1'), {});
@@ -863,7 +863,7 @@ describe('web', () => {
         });
         assert.deepEqual(wiki.zombies().length, 1);
         // flush
-        assert.deepEqual(wiki.flushRelRefs('1'), true);
+        assert.deepEqual(wiki.flushWeb('1'), true);
         // after flush
         assert.deepEqual(wiki.foreattrs('1'), {});
         assert.deepEqual(wiki.backattrs('2'), {});
@@ -897,7 +897,7 @@ describe('web', () => {
         });
         assert.deepEqual(wiki.zombies().length, 1);
         // flush
-        assert.deepEqual(wiki.flushRelRefs('1'), true);
+        assert.deepEqual(wiki.flushWeb('1'), true);
         // after flush
         assert.deepEqual(wiki.foreattrs('1'), {});
         assert.deepEqual(wiki.backattrs('2'), {});
@@ -944,7 +944,7 @@ describe('web', () => {
         });
         assert.deepEqual(wiki.zombies().length, 1);
         // flush
-        assert.deepEqual(wiki.flushRelRefs('1'), true);
+        assert.deepEqual(wiki.flushWeb('1'), true);
         // after flush
         assert.deepEqual(wiki.get('1')?.children, ['404']);
         assert.deepEqual(wiki.foreattrs('1'), {});
@@ -967,7 +967,7 @@ describe('web', () => {
       });
 
       it('single; node does not exist', () => {
-        assert.deepEqual(wiki.flushRelRefs('-1'), false);
+        assert.deepEqual(wiki.flushWeb('-1'), false);
       });
 
     });
@@ -976,14 +976,14 @@ describe('web', () => {
 
       it('connect with header throws', () => {
         assert.throws(
-          () => wiki.connect('1', '2', { kind: REL.REF.ATTR, type: 't', header: 'h1' }),
+          () => wiki.connect('1', '2', { kind: EDGE.KIND.ATTR, type: 't', header: 'h1' }),
           /attrs do not support headers/
         );
       });
 
       it('create new', () => {
         // go
-        assert.strictEqual(wiki.connect('1', '2', REL.REF.ATTR, 'test'), true);
+        assert.strictEqual(wiki.connect('1', '2', EDGE.KIND.ATTR, 'test'), true);
         // after
         assert.deepEqual(wiki.foreattrs('1'), {
           'test': new Set(['2']),
@@ -995,8 +995,8 @@ describe('web', () => {
 
       it('append to type', () => {
         // go
-        assert.strictEqual(wiki.connect('1', '2', REL.REF.ATTR, 'test'), true);
-        assert.strictEqual(wiki.connect('1', '3', REL.REF.ATTR, 'test'), true);
+        assert.strictEqual(wiki.connect('1', '2', EDGE.KIND.ATTR, 'test'), true);
+        assert.strictEqual(wiki.connect('1', '3', EDGE.KIND.ATTR, 'test'), true);
         // after
         assert.deepEqual(wiki.foreattrs('1'), {
           'test': new Set(['2', '3']),
@@ -1011,14 +1011,14 @@ describe('web', () => {
 
       it('source node does not exist', () => {
         // go
-        assert.strictEqual(wiki.connect('missing', '2', REL.REF.ATTR, 'test'), false);
+        assert.strictEqual(wiki.connect('missing', '2', EDGE.KIND.ATTR, 'test'), false);
         // after
         assert.deepEqual(wiki.backattrs('2'), {});
       });
 
       it('target node does not exist; create zombie node with data', () => {
         // go
-        assert.strictEqual(wiki.connect('1', 'missing', REL.REF.ATTR, 'test'), false);
+        assert.strictEqual(wiki.connect('1', 'missing', EDGE.KIND.ATTR, 'test'), false);
         // after
         assert.deepEqual(wiki.foreattrs('1'), {});
       });
@@ -1029,7 +1029,7 @@ describe('web', () => {
 
       it('untyped', () => {
         // go
-        assert.strictEqual(wiki.connect('1', '2', REL.REF.LINK, ''), true);
+        assert.strictEqual(wiki.connect('1', '2', EDGE.KIND.LINK, ''), true);
         // after
         assert.deepEqual(wiki.forelinks('1'), [{
           type: '',
@@ -1043,7 +1043,7 @@ describe('web', () => {
 
       it('typed', () => {
         // go
-        assert.strictEqual(wiki.connect('1', '2', REL.REF.LINK, 'test'), true);
+        assert.strictEqual(wiki.connect('1', '2', EDGE.KIND.LINK, 'test'), true);
         // after
         assert.deepEqual(wiki.forelinks('1'), [{
           type: 'test',
@@ -1057,8 +1057,8 @@ describe('web', () => {
 
       it('typed; multiples all saved', () => {
         // go
-        assert.strictEqual(wiki.connect('1', '2', REL.REF.LINK, 'test'), true);
-        assert.strictEqual(wiki.connect('1', '3', REL.REF.LINK, 'test'), true);
+        assert.strictEqual(wiki.connect('1', '2', EDGE.KIND.LINK, 'test'), true);
+        assert.strictEqual(wiki.connect('1', '3', EDGE.KIND.LINK, 'test'), true);
         // after
         assert.deepEqual(wiki.forelinks('1'), [{
           type: 'test',
@@ -1079,8 +1079,8 @@ describe('web', () => {
 
       it('typed; do not store duplicates', () => {
         // go
-        assert.strictEqual(wiki.connect('1', '2', REL.REF.LINK, 'test'), true);
-        assert.strictEqual(wiki.connect('1', '2', REL.REF.LINK, 'test'), true);
+        assert.strictEqual(wiki.connect('1', '2', EDGE.KIND.LINK, 'test'), true);
+        assert.strictEqual(wiki.connect('1', '2', EDGE.KIND.LINK, 'test'), true);
         // after
         assert.deepEqual(wiki.forelinks('1'), [{
           type: 'test',
@@ -1095,20 +1095,20 @@ describe('web', () => {
 
       it('source node does not exist', () => {
         // go
-        assert.strictEqual(wiki.connect('missing', '2', REL.REF.LINK, 'test'), false);
+        assert.strictEqual(wiki.connect('missing', '2', EDGE.KIND.LINK, 'test'), false);
         // after
         assert.deepEqual(wiki.backlinks('2'), []);
       });
 
       it('target node does not exist', () => {
         // go
-        assert.strictEqual(wiki.connect('1', 'missing', REL.REF.LINK, 'test'), false);
+        assert.strictEqual(wiki.connect('1', 'missing', EDGE.KIND.LINK, 'test'), false);
         // after
         assert.deepEqual(wiki.forelinks('1'), []);
       });
 
       it('header; stores header on link', () => {
-        assert.strictEqual(wiki.connect('1', '2', { kind: REL.REF.LINK, type: 'test', header: 'section-a' }), true);
+        assert.strictEqual(wiki.connect('1', '2', { kind: EDGE.KIND.LINK, type: 'test', header: 'section-a' }), true);
         assert.deepEqual(wiki.forelinks('1'), [{
           type: 'test',
           id: '2',
@@ -1122,8 +1122,8 @@ describe('web', () => {
       });
 
       it('header; same target different headers are separate links', () => {
-        assert.strictEqual(wiki.connect('1', '2', { kind: REL.REF.LINK, type: 't', header: 'a' }), true);
-        assert.strictEqual(wiki.connect('1', '2', { kind: REL.REF.LINK, type: 't', header: 'b' }), true);
+        assert.strictEqual(wiki.connect('1', '2', { kind: EDGE.KIND.LINK, type: 't', header: 'a' }), true);
+        assert.strictEqual(wiki.connect('1', '2', { kind: EDGE.KIND.LINK, type: 't', header: 'b' }), true);
         assert.strictEqual(wiki.forelinks('1').length, 2);
         assert.deepEqual(wiki.forelinks('1'), [
           { type: 't', id: '2', header: 'a' },
@@ -1132,8 +1132,8 @@ describe('web', () => {
       });
 
       it('header; file-level and header-level both stored', () => {
-        assert.strictEqual(wiki.connect('1', '2', { kind: REL.REF.LINK, type: 't' }), true);
-        assert.strictEqual(wiki.connect('1', '2', { kind: REL.REF.LINK, type: 't', header: 's1' }), true);
+        assert.strictEqual(wiki.connect('1', '2', { kind: EDGE.KIND.LINK, type: 't' }), true);
+        assert.strictEqual(wiki.connect('1', '2', { kind: EDGE.KIND.LINK, type: 't', header: 's1' }), true);
         assert.strictEqual(wiki.forelinks('1').length, 2);
         const links = wiki.forelinks('1');
         assert.strictEqual(links.some((l: any) => !l.header), true);
@@ -1146,19 +1146,19 @@ describe('web', () => {
 
       it('media kinds; media-absence = doc-embed, real kinds validate, junk rejected', () => {
         // doc-embed: no media arg -> media-absent embed
-        assert.strictEqual(wiki.connect('1', '2', REL.REF.EMBED), true);
+        assert.strictEqual(wiki.connect('1', '2', EDGE.KIND.EMBED), true);
         assert.deepEqual(wiki.index['1'].embeds, [{ id: '2' }]);
         // media-embed: explicit real kind
-        assert.strictEqual(wiki.connect('1', '3', REL.REF.EMBED, NODE.MEDIA.IMAGE), true);
+        assert.strictEqual(wiki.connect('1', '3', EDGE.KIND.EMBED, NODE.MEDIA.IMAGE), true);
         assert.deepEqual(wiki.index['1'].embeds, [{ id: '2' }, { id: '3', media: NODE.MEDIA.IMAGE }]);
         // invalid media kind rejected ('markdown' is no longer a media kind)
-        assert.strictEqual(wiki.connect('1', '4', REL.REF.EMBED, 'markdown'), false);
+        assert.strictEqual(wiki.connect('1', '4', EDGE.KIND.EMBED, 'markdown'), false);
         assert.strictEqual(fakeConsoleWarn.calledWith('invalid media kind: markdown'), true);
       });
 
       it('base', () => {
         // go
-        assert.strictEqual(wiki.connect('1', '2', REL.REF.EMBED), true);
+        assert.strictEqual(wiki.connect('1', '2', EDGE.KIND.EMBED), true);
         // after
         assert.deepEqual(wiki.foreembeds('1'), [{
           id: '2',
@@ -1170,8 +1170,8 @@ describe('web', () => {
 
       it('multiples all saved', () => {
         // go
-        assert.strictEqual(wiki.connect('1', '2', REL.REF.EMBED), true);
-        assert.strictEqual(wiki.connect('1', '3', REL.REF.EMBED), true);
+        assert.strictEqual(wiki.connect('1', '2', EDGE.KIND.EMBED), true);
+        assert.strictEqual(wiki.connect('1', '3', EDGE.KIND.EMBED), true);
         // after
         assert.deepEqual(wiki.foreembeds('1'), [{
           id: '2',
@@ -1188,8 +1188,8 @@ describe('web', () => {
 
       it('do not store duplicates', () => {
         // go
-        assert.strictEqual(wiki.connect('1', '2', REL.REF.EMBED), true);
-        assert.strictEqual(wiki.connect('1', '2', REL.REF.EMBED), true);
+        assert.strictEqual(wiki.connect('1', '2', EDGE.KIND.EMBED), true);
+        assert.strictEqual(wiki.connect('1', '2', EDGE.KIND.EMBED), true);
         // after
         assert.deepEqual(wiki.foreembeds('1'), [{
           id: '2',
@@ -1202,20 +1202,20 @@ describe('web', () => {
 
       it('source node does not exist', () => {
         // go
-        assert.strictEqual(wiki.connect('missing', '2', REL.REF.EMBED), false);
+        assert.strictEqual(wiki.connect('missing', '2', EDGE.KIND.EMBED), false);
         // after
         assert.deepEqual(wiki.backembeds('2'), []);
       });
 
       it('target node does not exist', () => {
         // go
-        assert.strictEqual(wiki.connect('1', 'missing', REL.REF.EMBED), false);
+        assert.strictEqual(wiki.connect('1', 'missing', EDGE.KIND.EMBED), false);
         // after
         assert.deepEqual(wiki.foreembeds('1'), []);
       });
 
       it('header; stores header on embed', () => {
-        assert.strictEqual(wiki.connect('1', '2', { kind: REL.REF.EMBED, header: 'intro' }), true);
+        assert.strictEqual(wiki.connect('1', '2', { kind: EDGE.KIND.EMBED, header: 'intro' }), true);
         assert.deepEqual(wiki.foreembeds('1'), [{
           id: '2',
           header: 'intro',
@@ -1227,8 +1227,8 @@ describe('web', () => {
       });
 
       it('header; same target different headers are separate embeds', () => {
-        assert.strictEqual(wiki.connect('1', '2', { kind: REL.REF.EMBED, header: 'a' }), true);
-        assert.strictEqual(wiki.connect('1', '2', { kind: REL.REF.EMBED, header: 'b' }), true);
+        assert.strictEqual(wiki.connect('1', '2', { kind: EDGE.KIND.EMBED, header: 'a' }), true);
+        assert.strictEqual(wiki.connect('1', '2', { kind: EDGE.KIND.EMBED, header: 'b' }), true);
         assert.strictEqual(wiki.foreembeds('1').length, 2);
         assert.deepEqual(wiki.foreembeds('1'), [
           { id: '2', header: 'a' },
@@ -1297,7 +1297,7 @@ describe('web', () => {
           'old-type': new Set('1'),
         });
         // retype
-        const res: boolean = wiki.retype('old-type', 'new-type', REL.REF.ATTR);
+        const res: boolean = wiki.retype('old-type', 'new-type', EDGE.KIND.ATTR);
         // after retype
         assert.strictEqual(res, true);
         assert.deepEqual(wiki.foreattrs('1'), {
@@ -1324,7 +1324,7 @@ describe('web', () => {
           id: '1',
         }]);
         // retype
-        const res: boolean = wiki.retype('old-type', 'new-type', REL.REF.ATTR);
+        const res: boolean = wiki.retype('old-type', 'new-type', EDGE.KIND.ATTR);
         // after retype
         assert.strictEqual(res, true);
         assert.deepEqual(wiki.forelinks('1'), [{
@@ -1357,7 +1357,7 @@ describe('web', () => {
           id: '1',
         }]);
         // retype
-        const res: boolean = wiki.retype('old-type', 'new-type', REL.REF.LINK);
+        const res: boolean = wiki.retype('old-type', 'new-type', EDGE.KIND.LINK);
         // after retype
         assert.strictEqual(res, true);
         assert.deepEqual(wiki.forelinks('1'), [{
@@ -1381,7 +1381,7 @@ describe('web', () => {
           'old-type': new Set('1'),
         });
         // retype
-        const res: boolean = wiki.retype('old-type', 'new-type', REL.REF.LINK);
+        const res: boolean = wiki.retype('old-type', 'new-type', EDGE.KIND.LINK);
         // after retype
         assert.strictEqual(res, true);
         assert.deepEqual(wiki.foreattrs('1'), {
@@ -1474,7 +1474,7 @@ describe('web', () => {
 
         it('base; source and target both exist', () => {
           // go
-          assert.strictEqual(wiki.transfer('1', '3', REL.REF.ATTR), true);
+          assert.strictEqual(wiki.transfer('1', '3', EDGE.KIND.ATTR), true);
           // after
           const transferredNode: Node | undefined = wiki.get('3');
           if (!transferredNode) { assert.fail(); }
@@ -1501,11 +1501,11 @@ describe('web', () => {
         });
 
         it('source does not exist', () => {
-          assert.strictEqual(wiki.transfer('-1', '1', REL.REF.ATTR), false);
+          assert.strictEqual(wiki.transfer('-1', '1', EDGE.KIND.ATTR), false);
         });
 
         it('target does not exist', () => {
-          assert.strictEqual(wiki.transfer('1', '-1', REL.REF.ATTR), false);
+          assert.strictEqual(wiki.transfer('1', '-1', EDGE.KIND.ATTR), false);
         });
 
       });
@@ -1514,7 +1514,7 @@ describe('web', () => {
 
         it('base; source and target both exist', () => {
           // go
-          assert.strictEqual(wiki.transfer('1', '3', REL.REF.LINK), true);
+          assert.strictEqual(wiki.transfer('1', '3', EDGE.KIND.LINK), true);
           // after
           const transferredNode: Node | undefined = wiki.get('3');
           if (!transferredNode) { assert.fail(); }
@@ -1541,11 +1541,11 @@ describe('web', () => {
         });
 
         it('source does not exist', () => {
-          assert.strictEqual(wiki.transfer('-1', '1', REL.REF.LINK), false);
+          assert.strictEqual(wiki.transfer('-1', '1', EDGE.KIND.LINK), false);
         });
 
         it('target does not exist', () => {
-          assert.strictEqual(wiki.transfer('1', '-1', REL.REF.LINK), false);
+          assert.strictEqual(wiki.transfer('1', '-1', EDGE.KIND.LINK), false);
         });
 
       });
@@ -1554,7 +1554,7 @@ describe('web', () => {
 
         it('base; source and target both exist', () => {
           // go
-          assert.strictEqual(wiki.transfer('1', '3', REL.REF.EMBED), true);
+          assert.strictEqual(wiki.transfer('1', '3', EDGE.KIND.EMBED), true);
           // after
           const transferredNode: Node | undefined = wiki.get('3');
           if (!transferredNode) { assert.fail(); }
@@ -1581,11 +1581,11 @@ describe('web', () => {
         });
 
         it('source does not exist', () => {
-          assert.strictEqual(wiki.transfer('-1', '1', REL.REF.EMBED), false);
+          assert.strictEqual(wiki.transfer('-1', '1', EDGE.KIND.EMBED), false);
         });
 
         it('target does not exist', () => {
-          assert.strictEqual(wiki.transfer('1', '-1', REL.REF.EMBED), false);
+          assert.strictEqual(wiki.transfer('1', '-1', EDGE.KIND.EMBED), false);
         });
 
       });
@@ -1605,7 +1605,7 @@ describe('web', () => {
           'test': new Set(['1']),
         });
         // rm
-        assert.strictEqual(wiki.disconnect('1', '2', REL.REF.ATTR, 'test'), true);
+        assert.strictEqual(wiki.disconnect('1', '2', EDGE.KIND.ATTR, 'test'), true);
         // after rm
         assert.deepEqual(wiki.foreattrs('1'), {});
         assert.deepEqual(wiki.backattrs('2'), {});
@@ -1625,7 +1625,7 @@ describe('web', () => {
           'test': new Set(['1']),
         });
         // 
-        assert.strictEqual(wiki.disconnect('1', '2', REL.REF.ATTR, 'test'), true);
+        assert.strictEqual(wiki.disconnect('1', '2', EDGE.KIND.ATTR, 'test'), true);
         // after rm
         assert.deepEqual(wiki.foreattrs('1'), {
           'test': new Set(['3']),
@@ -1640,7 +1640,7 @@ describe('web', () => {
         // before
         wiki.index['1'].attrs['test'] = new Set(['2']);
         // rm
-        assert.strictEqual(wiki.disconnect('missing', '2', REL.REF.ATTR, 'test'), false);
+        assert.strictEqual(wiki.disconnect('missing', '2', EDGE.KIND.ATTR, 'test'), false);
         assert.deepEqual(wiki.foreattrs('1'), {
           'test': new Set(['2']),
         });
@@ -1653,7 +1653,7 @@ describe('web', () => {
         // before
         wiki.index['1'].attrs['test'] = new Set(['2']);
         // rm
-        assert.strictEqual(wiki.disconnect('1', 'missing', REL.REF.ATTR, 'test'), false);
+        assert.strictEqual(wiki.disconnect('1', 'missing', EDGE.KIND.ATTR, 'test'), false);
         // after
         assert.strictEqual(fakeConsoleWarn.getCall(0).args[0], 'target node with id "missing" not found');
         assert.deepEqual(wiki.foreattrs('1'), {
@@ -1684,7 +1684,7 @@ describe('web', () => {
           id: '1',
         }]);
         // rm
-        assert.strictEqual(wiki.disconnect('1', '2', REL.REF.LINK, ''), true);
+        assert.strictEqual(wiki.disconnect('1', '2', EDGE.KIND.LINK, ''), true);
         // after rm
         assert.deepEqual(wiki.forelinks('1'), []);
         assert.deepEqual(wiki.backlinks('2'), []);
@@ -1706,7 +1706,7 @@ describe('web', () => {
           id: '1',
         }]);
         // rm
-        assert.strictEqual(wiki.disconnect('1', '2', REL.REF.LINK, ''), true);
+        assert.strictEqual(wiki.disconnect('1', '2', EDGE.KIND.LINK, ''), true);
         // after rm
         assert.deepEqual(wiki.forelinks('1'), []);
         assert.deepEqual(wiki.backlinks('2'), []);
@@ -1730,7 +1730,7 @@ describe('web', () => {
           id: '1',
         }]);
         // rm
-        assert.strictEqual(wiki.disconnect('1', '2', REL.REF.LINK, 'test'), true);
+        assert.strictEqual(wiki.disconnect('1', '2', EDGE.KIND.LINK, 'test'), true);
         // after rm
         assert.deepEqual(wiki.forelinks('1'), []);
         assert.deepEqual(wiki.backlinks('2'), []);
@@ -1742,7 +1742,7 @@ describe('web', () => {
           type: 'test',
           id: '2',
         }];
-        assert.strictEqual(wiki.disconnect('missing', '2', REL.REF.LINK, 'test'), false);
+        assert.strictEqual(wiki.disconnect('missing', '2', EDGE.KIND.LINK, 'test'), false);
         assert.deepEqual(wiki.backlinks('2'), [{
           type: 'test',
           id: '1',
@@ -1756,7 +1756,7 @@ describe('web', () => {
           id: '2',
         }];
         // go
-        assert.strictEqual(wiki.disconnect('1', 'missing', REL.REF.LINK, 'test'), false);
+        assert.strictEqual(wiki.disconnect('1', 'missing', EDGE.KIND.LINK, 'test'), false);
         // after
         assert.strictEqual(fakeConsoleWarn.getCall(0).args[0], 'target node with id "missing" not found');
         assert.deepEqual(wiki.forelinks('1'), [{
@@ -1766,9 +1766,9 @@ describe('web', () => {
       });
 
       it('header; removes only the matching header link', () => {
-        wiki.connect('1', '2', { kind: REL.REF.LINK, type: 't', header: 'a' });
-        wiki.connect('1', '2', { kind: REL.REF.LINK, type: 't', header: 'b' });
-        assert.strictEqual(wiki.disconnect('1', '2', { kind: REL.REF.LINK, type: 't', header: 'a' }), true);
+        wiki.connect('1', '2', { kind: EDGE.KIND.LINK, type: 't', header: 'a' });
+        wiki.connect('1', '2', { kind: EDGE.KIND.LINK, type: 't', header: 'b' });
+        assert.strictEqual(wiki.disconnect('1', '2', { kind: EDGE.KIND.LINK, type: 't', header: 'a' }), true);
         assert.deepEqual(wiki.forelinks('1'), [{ type: 't', id: '2', header: 'b' }]);
       });
 
@@ -1789,7 +1789,7 @@ describe('web', () => {
           id: '1',
         }]);
         // rm
-        assert.strictEqual(wiki.disconnect('1', '2', REL.REF.EMBED), true);
+        assert.strictEqual(wiki.disconnect('1', '2', EDGE.KIND.EMBED), true);
         // after rm
         assert.deepEqual(wiki.foreembeds('1'), []);
         assert.deepEqual(wiki.backembeds('2'), []);
@@ -1800,7 +1800,7 @@ describe('web', () => {
         wiki.index['1'].embeds = [{
           id: '2',
         }];
-        assert.strictEqual(wiki.disconnect('missing', '2', REL.REF.EMBED), false);
+        assert.strictEqual(wiki.disconnect('missing', '2', EDGE.KIND.EMBED), false);
         assert.deepEqual(wiki.backembeds('2'), [{
           id: '1',
         }]);
@@ -1812,7 +1812,7 @@ describe('web', () => {
           id: '2',
         }];
         // go
-        assert.strictEqual(wiki.disconnect('1', 'missing', REL.REF.EMBED), false);
+        assert.strictEqual(wiki.disconnect('1', 'missing', EDGE.KIND.EMBED), false);
         // after
         assert.strictEqual(fakeConsoleWarn.getCall(0).args[0], 'target node with id "missing" not found');
         assert.deepEqual(wiki.foreembeds('1'), [{
@@ -1821,9 +1821,9 @@ describe('web', () => {
       });
 
       it('header; removes only the matching header embed', () => {
-        wiki.connect('1', '2', { kind: REL.REF.EMBED, header: 'x' });
-        wiki.connect('1', '2', { kind: REL.REF.EMBED, header: 'y' });
-        assert.strictEqual(wiki.disconnect('1', '2', { kind: REL.REF.EMBED, header: 'x' }), true);
+        wiki.connect('1', '2', { kind: EDGE.KIND.EMBED, header: 'x' });
+        wiki.connect('1', '2', { kind: EDGE.KIND.EMBED, header: 'y' });
+        assert.strictEqual(wiki.disconnect('1', '2', { kind: EDGE.KIND.EMBED, header: 'x' }), true);
         assert.deepEqual(wiki.foreembeds('1'), [{ id: '2', header: 'y' }]);
       });
 

@@ -4,7 +4,7 @@ import sinon from 'sinon';
 import nanoid from 'nanoid';
 
 import type { ChangeEvent } from '../src/store';
-import { Caudex, REL } from '../src/index';
+import { Caudex, EDGE } from '../src/index';
 
 
 // mechanism tests for the typed change-event API (composition refactor, phase 4
@@ -55,10 +55,10 @@ describe('change events (mechanism)', () => {
 
     it('onChange() delivers events; returned unsubscribe stops them', () => {
       const unsubscribe: () => void = wb.store.onChange((e: ChangeEvent) => events.push(e));
-      wb.connect('1', '2', REL.REF.LINK, 'linktype');
+      wb.connect('1', '2', EDGE.KIND.LINK, 'linktype');
       assert.strictEqual(events.length, 1);
       unsubscribe();
-      wb.connect('3', '2', REL.REF.LINK, 'linktype');
+      wb.connect('3', '2', EDGE.KIND.LINK, 'linktype');
       assert.strictEqual(events.length, 1);
     });
 
@@ -66,7 +66,7 @@ describe('change events (mechanism)', () => {
 
   describe('node-kind events (base mutations)', () => {
 
-    it('add / rm / fill / flushRels / clear each signal their op', () => {
+    it('add / rm / fill / flushGraph / clear each signal their op', () => {
       subscribe();
       wb.add({ uri: 'file://data/5', filename: 'five', title: 'Five' }, { id: '5' });
       assert.deepEqual(lastEvent(), { kind: 'node', op: 'add' });
@@ -74,8 +74,8 @@ describe('change events (mechanism)', () => {
       assert.deepEqual(lastEvent(), { kind: 'node', op: 'fill', id: '5' });
       wb.rm('5');
       assert.deepEqual(lastEvent(), { kind: 'node', op: 'rm', id: '5' });
-      wb.flushRels();
-      assert.deepEqual(lastEvent(), { kind: 'node', op: 'flushRels' });
+      wb.flushGraph();
+      assert.deepEqual(lastEvent(), { kind: 'node', op: 'flushGraph' });
       wb.clear();
       assert.deepEqual(lastEvent(), { kind: 'node', op: 'clear' });
     });
@@ -92,7 +92,7 @@ describe('change events (mechanism)', () => {
 
   describe('tree-kind events (hierarchy mutations)', () => {
 
-    it('graft / prune / replace / transplant / flushRelFams each signal their op', () => {
+    it('graft / prune / replace / transplant / flushTree each signal their op', () => {
       subscribe();
       wb.graft('2', '4');
       assert.deepEqual(lastEvent(), { kind: 'tree', op: 'graft', id: '4' });
@@ -102,8 +102,8 @@ describe('change events (mechanism)', () => {
       assert.deepEqual(lastEvent(), { kind: 'tree', op: 'replace', id: '4' });
       wb.transplant('2', [{ id: '2', children: [] }]);
       assert.deepEqual(lastEvent(), { kind: 'tree', op: 'transplant', id: '2' });
-      wb.flushRelFams();
-      assert.deepEqual(lastEvent(), { kind: 'tree', op: 'flushRelFams' });
+      wb.flushTree();
+      assert.deepEqual(lastEvent(), { kind: 'tree', op: 'flushTree' });
     });
 
     it('tree-kind invalidates ONLY the parent index', () => {
@@ -118,24 +118,24 @@ describe('change events (mechanism)', () => {
 
   describe('web-kind events (relation mutations)', () => {
 
-    it('connect / disconnect / retype / transfer / flushRelRefs each signal their op', () => {
+    it('connect / disconnect / retype / transfer / flushWeb each signal their op', () => {
       subscribe();
-      wb.connect('1', '2', REL.REF.LINK, 'linktype');
+      wb.connect('1', '2', EDGE.KIND.LINK, 'linktype');
       assert.deepEqual(lastEvent(), { kind: 'web', op: 'connect', id: '1' });
-      wb.disconnect('1', '2', REL.REF.LINK, 'linktype');
+      wb.disconnect('1', '2', EDGE.KIND.LINK, 'linktype');
       assert.deepEqual(lastEvent(), { kind: 'web', op: 'disconnect', id: '1' });
-      wb.retype('linktype', 'renamed', REL.REF.LINK);
+      wb.retype('linktype', 'renamed', EDGE.KIND.LINK);
       assert.deepEqual(lastEvent(), { kind: 'web', op: 'retype' });
       wb.transfer('1', '4');
       assert.deepEqual(lastEvent(), { kind: 'web', op: 'transfer', id: '1' });
-      wb.flushRelRefs('4');
-      assert.deepEqual(lastEvent(), { kind: 'web', op: 'flushRelRefs', id: '4' });
+      wb.flushWeb('4');
+      assert.deepEqual(lastEvent(), { kind: 'web', op: 'flushWeb', id: '4' });
     });
 
     it('web-kind invalidates ONLY the back-ref index', () => {
       wb.rebuildParentIndex();
       wb.rebuildBackRefsIndex();
-      wb.connect('1', '2', REL.REF.LINK, 'linktype');
+      wb.connect('1', '2', EDGE.KIND.LINK, 'linktype');
       assert.strictEqual(wb.parentIndexDirty, false);
       assert.strictEqual(wb.backRefsIndexDirty, true);
     });
