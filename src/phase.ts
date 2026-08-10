@@ -9,7 +9,7 @@ import { BaseAPI, CaudexCtx } from './base';
 // lifecycle of increasing connectedness, DERIVED per-node (TERMS.md):
 //
 //                 in web        not in web
-//   in tree     integrated     wallflower
+//   in tree     integrated     spur
 //   not in tree   orphan         isolate
 //
 // phase is a CROSS-axis concern, so it sits ABOVE the tree and web layers in
@@ -60,13 +60,13 @@ export interface PhaseAPI {
   phases(opts?: QueryOpts): Record<NODE.PHASE, string[] | Node[] | any[]>;
   integrated(opts?: QueryOpts): string[] | Node[] | any[];
   orphans(opts?: QueryOpts): string[] | Node[] | any[];
-  wallflowers(opts?: QueryOpts): string[] | Node[] | any[];
+  spurs(opts?: QueryOpts): string[] | Node[] | any[];
   isolates(opts?: QueryOpts): string[] | Node[] | any[];
 }
 
 export function phase(ctx: CaudexCtx, base: BaseAPI): PhaseAPI {
   const { store } = ctx;
-  const { checkLock, all, get } = base;
+  const { checkLock, nodes, get } = base;
 
   // the two attachment axes -- registered into ctx.attachment, which is where
   // base.graphCtx() (and thereby every node's 'phase()') looks them up.
@@ -87,10 +87,10 @@ export function phase(ctx: CaudexCtx, base: BaseAPI): PhaseAPI {
     const cells: Record<NODE.PHASE, any[]> = {
       [NODE.PHASE.ISOLATE]: [],
       [NODE.PHASE.ORPHAN]: [],
-      [NODE.PHASE.WALLFLOWER]: [],
+      [NODE.PHASE.SPUR]: [],
       [NODE.PHASE.INTEGRATED]: [],
     };
-    for (const node of (all({ ...opts, payload: QUERY_TYPE.NODE }) as Node[] ?? [])) {
+    for (const node of (nodes({ ...opts, payload: QUERY_TYPE.NODE }) as Node[] ?? [])) {
       if (node.state() === NODE.STATE.ZOMBIE) { continue; }
       cells[node.phase()].push(get(node.id, { ...opts, payload }));
     }
@@ -105,8 +105,8 @@ export function phase(ctx: CaudexCtx, base: BaseAPI): PhaseAPI {
     return phases(opts)[NODE.PHASE.ORPHAN];
   }
 
-  function wallflowers(opts?: QueryOpts): string[] | Node[] | any[] {
-    return phases(opts)[NODE.PHASE.WALLFLOWER];
+  function spurs(opts?: QueryOpts): string[] | Node[] | any[] {
+    return phases(opts)[NODE.PHASE.SPUR];
   }
 
   function isolates(opts?: QueryOpts): string[] | Node[] | any[] {
@@ -119,7 +119,7 @@ export function phase(ctx: CaudexCtx, base: BaseAPI): PhaseAPI {
     phases,
     integrated,
     orphans,
-    wallflowers,
+    spurs,
     isolates,
   };
 }

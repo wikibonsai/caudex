@@ -153,7 +153,7 @@ The "base" portion handles the storage-facing operations either structure needs 
 
 Every answer the caudex gives is either read from the store or derived from it on demand -- nothing queryable is cached anywhere it could go stale. It is helpful to think of each method as fitting into one of a few categories that dictate how it works and what it returns.
 
-"Properties" are methods that describe the state of the `caudex`. For example, `all()` returns all of the node ids that currently exist and `nodetypes()`/`edgetypes()` return the open type vocabularies in use. A few properties live on the *node* rather than the caudex -- `node.state()` and `node.phase()` -- and are likewise derived at call time (phase reads the graph through a context bound at the node's creation).
+"Properties" are methods that describe the state of the `caudex`. For example, `nodes()` returns all of the node ids that currently exist and `nodetypes()`/`edgetypes()` return the open type vocabularies in use. A few properties live on the *node* rather than the caudex -- `node.state()` and `node.phase()` -- and are likewise derived at call time (phase reads the graph through a context bound at the node's creation).
 
 "Relational properties" are methods that describe relationships between nodes and often take an `id: string` argument. For example, `ancestors(id: string)` returns an array of node ids that form the ancestry of the node with the given `id` and `backlinks(id: string)` returns an array of node ids who contain the node with the given `id` in its links. Inverse queries like these are backed by the derived indexes, so they are index-lookups, not full scans.
 
@@ -175,7 +175,7 @@ Properties can be called with a `QUERY_TYPE`, which will determine the type of d
 
 #### 'Properties'
 
-##### `all(): string[]`
+##### `nodes(): string[]`
 
 Returns all node ids in the caudex.
 
@@ -257,7 +257,7 @@ The node's **integration phase** -- tree x web attachment, a lifecycle of increa
 
 |                 | in web       | not in web   |
 |-----------------|--------------|--------------|
-| **in tree**     | `integrated` | `wallflower` |
+| **in tree**     | `integrated` | `spur` |
 | **not in tree** | `orphan`     | `isolate`    |
 
 Evaluated lazily against the caudex's attachment indexes via a graph context bound at node creation, so the same node object always answers fresh. Reported truthfully for any node -- a referenced zombie reads `orphan` (its `state()` stays `zombie`). A node constructed outside a caudex has no graph context: `phase()` throws; `state()` works standalone.
@@ -268,7 +268,7 @@ The attachment indexes live in the phase layer atop tree + web (`create` compose
 
 Returns the whole 2x2 in one pass: every **live** node id sorted into its phase cell. The bulk queries gate zombies out by state, so health ratios count only live docs.
 
-##### `integrated()` / `orphans()` / `wallflowers()` / `isolates()`
+##### `integrated()` / `orphans()` / `spurs()` / `isolates()`
 
 Each returns one cell of `phases()`. (Note: `orphans` and `isolates` used to live on tree/web with single-axis meanings -- "leaf with no parent" and "no web neighbors" respectively; those retired with the TERMS reorg.)
 

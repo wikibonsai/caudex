@@ -145,12 +145,12 @@ describe('base', () => {
       it.skip('all(\'data\')', () => { return; });
 
       it('all() / all(\'id\')', () => {
-        assert.deepEqual(base.all(), ['1', '2']);
-        assert.deepEqual(base.all({ payload: QUERY_TYPE.ID }), ['1', '2']);
+        assert.deepEqual(base.nodes(), ['1', '2']);
+        assert.deepEqual(base.nodes({ payload: QUERY_TYPE.ID }), ['1', '2']);
       });
 
       it('all(\'node\')', () => {
-        assert.deepEqual(base.all({ payload: QUERY_TYPE.NODE }), [
+        assert.deepEqual(base.nodes({ payload: QUERY_TYPE.NODE }), [
           {
             id: '1',
             kind: NODE.KIND.DOC,
@@ -201,37 +201,37 @@ describe('base', () => {
       });
 
       it('filter by nodeKind DOC', () => {
-        const out = base.all({ filter: { nodeKind: NODE.KIND.DOC } }) as string[];
+        const out = base.nodes({ filter: { nodeKind: NODE.KIND.DOC } }) as string[];
         assert.strictEqual(out.length, 3);
         assert.ok(out.includes('1') && out.includes('2') && out.includes('4'));
       });
 
       it('filter by nodeState ZOMBIE', () => {
-        const out = base.all({ filter: { nodeState: NODE.STATE.ZOMBIE } }) as string[];
+        const out = base.nodes({ filter: { nodeState: NODE.STATE.ZOMBIE } }) as string[];
         assert.deepEqual(out, ['404']);
       });
 
       it('filter by nodeType entry', () => {
-        const out = base.all({ filter: { nodeType: 'entry' } }) as string[];
+        const out = base.nodes({ filter: { nodeType: 'entry' } }) as string[];
         assert.deepEqual(out.sort(), ['1', '4']);
       });
 
       it('filter by nodeType index', () => {
-        const out = base.all({ filter: { nodeType: 'index' } }) as string[];
+        const out = base.nodes({ filter: { nodeType: 'index' } }) as string[];
         assert.deepEqual(out, ['2']);
       });
 
       it('filter by filename', () => {
-        assert.deepEqual(base.all({ filter: { filename: 'one' } }), ['1']);
+        assert.deepEqual(base.nodes({ filter: { filename: 'one' } }), ['1']);
       });
 
       it('filter by nodeKind and nodeType', () => {
-        const out = base.all({ filter: { nodeKind: NODE.KIND.DOC, nodeType: 'entry' } }) as string[];
+        const out = base.nodes({ filter: { nodeKind: NODE.KIND.DOC, nodeType: 'entry' } }) as string[];
         assert.deepEqual(out.sort(), ['1', '4']);
       });
 
       it('filter with no matches', () => {
-        assert.deepEqual(base.all({ filter: { nodeType: 'nonexistent' } }), []);
+        assert.deepEqual(base.nodes({ filter: { nodeType: 'nonexistent' } }), []);
       });
 
     });
@@ -250,44 +250,44 @@ describe('base', () => {
       });
 
       it('payload id (default)', () => {
-        const out = base.all() as string[];
+        const out = base.nodes() as string[];
         assert.deepEqual(out.sort(), ['1', '2', '3', '4']);
       });
 
       it('payload id (explicit)', () => {
-        const out = base.all({ payload: QUERY_TYPE.ID }) as string[];
+        const out = base.nodes({ payload: QUERY_TYPE.ID }) as string[];
         assert.deepEqual(out.sort(), ['1', '2', '3', '4']);
       });
 
       it('payload node', () => {
-        const out = base.all({ payload: QUERY_TYPE.NODE }) as Node[];
+        const out = base.nodes({ payload: QUERY_TYPE.NODE }) as Node[];
         assert.strictEqual(out.length, 4);
         assert.strictEqual(out[0].id, '1');
       });
 
       it('payload data', () => {
-        const out = base.all({ payload: QUERY_TYPE.DATA }) as any[];
+        const out = base.nodes({ payload: QUERY_TYPE.DATA }) as any[];
         assert.strictEqual(out.length, 4);
         assert.ok(out.every((d: any) => d.uri && d.filename && d.title && Array.isArray(d.headers)));
       });
 
       it('payload nodekind', () => {
-        const out = base.all({ payload: QUERY_TYPE.NODEKIND }) as string[];
+        const out = base.nodes({ payload: QUERY_TYPE.NODEKIND }) as string[];
         assert.strictEqual(out.length, 4);
         assert.ok(out.every((k: string) => k === NODE.KIND.DOC));
       });
 
       it('payload nodetype', () => {
-        const out = base.all({ payload: QUERY_TYPE.NODETYPE }) as string[];
+        const out = base.nodes({ payload: QUERY_TYPE.NODETYPE }) as string[];
         assert.strictEqual(out.length, 4);
       });
 
       it('payload single data key', () => {
-        assert.deepEqual((base.all({ payload: 'filename' }) as string[]).sort(), ['four', 'one', 'three', 'two']);
+        assert.deepEqual((base.nodes({ payload: 'filename' }) as string[]).sort(), ['four', 'one', 'three', 'two']);
       });
 
       it('payload multiple data keys', () => {
-        const out = base.all({ payload: ['filename', 'uri'] }) as any[];
+        const out = base.nodes({ payload: ['filename', 'uri'] }) as any[];
         assert.strictEqual(out.length, 4);
         assert.deepEqual(out.find((o: any) => o.filename === 'one'), { filename: 'one', uri: 'file://data/1' });
       });
@@ -295,7 +295,7 @@ describe('base', () => {
       it('filter and payload combined', () => {
         base.index['1'].type = 'entry';
         base.index['4'].type = 'entry';
-        const out = base.all({ filter: { nodeType: 'entry' }, payload: 'filename' }) as string[];
+        const out = base.nodes({ filter: { nodeType: 'entry' }, payload: 'filename' }) as string[];
         assert.deepEqual(out.sort(), ['four', 'one']);
       });
 
@@ -383,32 +383,32 @@ describe('base', () => {
 
       describe('filter', () => {
         it('filter.nodeKind returns only matching kind', () => {
-          assert.deepEqual(base.all({ filter: { nodeKind: NODE.KIND.DOC } }), ['1', '2']);
+          assert.deepEqual(base.nodes({ filter: { nodeKind: NODE.KIND.DOC } }), ['1', '2']);
           base.add('zombie-filename');
-          assert.deepEqual(base.all({ filter: { nodeKind: NODE.KIND.DOC } }), ['1', '2']);
-          assert.deepEqual(base.all({ filter: { nodeState: NODE.STATE.ZOMBIE } }), ['404']);
+          assert.deepEqual(base.nodes({ filter: { nodeKind: NODE.KIND.DOC } }), ['1', '2']);
+          assert.deepEqual(base.nodes({ filter: { nodeState: NODE.STATE.ZOMBIE } }), ['404']);
         });
 
         it('filter.nodeType returns only matching type', () => {
           base.index['1'].type = NODE.TYPE.ENTRY as string;
           base.index['2'].type = NODE.TYPE.DEFAULT;
-          assert.deepEqual(base.all({ filter: { nodeType: NODE.TYPE.ENTRY } }), ['1']);
-          assert.deepEqual(base.all({ filter: { nodeType: NODE.TYPE.DEFAULT } }), ['2']);
+          assert.deepEqual(base.nodes({ filter: { nodeType: NODE.TYPE.ENTRY } }), ['1']);
+          assert.deepEqual(base.nodes({ filter: { nodeType: NODE.TYPE.DEFAULT } }), ['2']);
         });
 
         it('filter.filename returns only matching node', () => {
-          assert.deepEqual(base.all({ filter: { filename: 'one' } }), ['1']);
-          assert.deepEqual(base.all({ filter: { filename: 'two' } }), ['2']);
-          assert.deepEqual(base.all({ filter: { filename: 'nonexistent' } }), []);
+          assert.deepEqual(base.nodes({ filter: { filename: 'one' } }), ['1']);
+          assert.deepEqual(base.nodes({ filter: { filename: 'two' } }), ['2']);
+          assert.deepEqual(base.nodes({ filter: { filename: 'nonexistent' } }), []);
         });
 
         it('filter combines with payload', () => {
           base.index['1'].type = NODE.TYPE.ENTRY as string;
-          const out = base.all({ filter: { nodeType: NODE.TYPE.ENTRY }, payload: QUERY_TYPE.NODE }) as Node[];
+          const out = base.nodes({ filter: { nodeType: NODE.TYPE.ENTRY }, payload: QUERY_TYPE.NODE }) as Node[];
           assert.strictEqual(out.length, 1);
           assert.strictEqual(out[0].id, '1');
           assert.deepEqual(
-            base.all({ filter: { filename: 'one' }, payload: 'title' }),
+            base.nodes({ filter: { filename: 'one' }, payload: 'title' }),
             ['One']
           );
         });
@@ -417,12 +417,12 @@ describe('base', () => {
       describe('payload', () => {
 
         it('payload id (default)', () => {
-          assert.deepEqual(base.all(), ['1', '2']);
-          assert.deepEqual(base.all({ payload: QUERY_TYPE.ID }), ['1', '2']);
+          assert.deepEqual(base.nodes(), ['1', '2']);
+          assert.deepEqual(base.nodes({ payload: QUERY_TYPE.ID }), ['1', '2']);
         });
 
         it('payload node', () => {
-          const nodes = base.all({ payload: QUERY_TYPE.NODE }) as Node[];
+          const nodes = base.nodes({ payload: QUERY_TYPE.NODE }) as Node[];
           assert.strictEqual(nodes.length, 2);
           assert.strictEqual(nodes[0].id, '1');
           assert.strictEqual(nodes[0].kind, NODE.KIND.DOC);
@@ -430,27 +430,27 @@ describe('base', () => {
         });
 
         it('payload nodekind', () => {
-          assert.deepEqual(base.all({ payload: QUERY_TYPE.NODEKIND }), [NODE.KIND.DOC, NODE.KIND.DOC]);
+          assert.deepEqual(base.nodes({ payload: QUERY_TYPE.NODEKIND }), [NODE.KIND.DOC, NODE.KIND.DOC]);
         });
 
         it('payload nodetype', () => {
-          assert.deepEqual(base.all({ payload: QUERY_TYPE.NODETYPE }), [NODE.TYPE.DEFAULT, NODE.TYPE.DEFAULT]);
+          assert.deepEqual(base.nodes({ payload: QUERY_TYPE.NODETYPE }), [NODE.TYPE.DEFAULT, NODE.TYPE.DEFAULT]);
         });
 
         it('payload data', () => {
-          const out = base.all({ payload: QUERY_TYPE.DATA }) as any[];
+          const out = base.nodes({ payload: QUERY_TYPE.DATA }) as any[];
           assert.strictEqual(out.length, 2);
           assert.deepEqual(out[0], { uri: 'file://data/1', filename: 'one', title: 'One' });
           assert.deepEqual(out[1], { uri: 'file://data/2', filename: 'two', title: 'Two' });
         });
 
         it('payload single string (data key)', () => {
-          assert.deepEqual(base.all({ payload: 'filename' }), ['one', 'two']);
-          assert.deepEqual(base.all({ payload: 'title' }), ['One', 'Two']);
+          assert.deepEqual(base.nodes({ payload: 'filename' }), ['one', 'two']);
+          assert.deepEqual(base.nodes({ payload: 'title' }), ['One', 'Two']);
         });
 
         it('payload string[] (multiple keys → object)', () => {
-          const out = base.all({ payload: ['id', 'filename', 'title'] }) as any[];
+          const out = base.nodes({ payload: ['id', 'filename', 'title'] }) as any[];
           assert.strictEqual(out.length, 2);
           assert.deepEqual(out[0], { id: '1', filename: 'one', title: 'One' });
           assert.deepEqual(out[1], { id: '2', filename: 'two', title: 'Two' });

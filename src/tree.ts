@@ -24,28 +24,28 @@ export interface TreeAPI {
   descendants(id: string, opts?: QueryOpts): string[] | Node[] | any[] | undefined;
   lineage(id: string, opts?: QueryOpts): string[] | Node[] | any[] | undefined;
   level(id: string): number | undefined;
-  // util
-  walkUp(id: string): string[];
-  walkDown(id: string): string[];
   // methods
   flushTree(): boolean;
   graft(parentID: string, childID: string, force?: boolean): boolean;
   replace(sourceID: string, targetID: string): boolean;
   transplant(subrootID: string, subtree: { id: string, children: string[] }[]): boolean;
   prune(parentID: string, childID: string, force?: boolean): boolean;
-  // tree utils
+  // validators
   inTree(id: string): boolean;
   isRoot(id: string): boolean;
   isLeaf(id: string): boolean;
   isTree(curNode?: Node | undefined, visited?: Set<string>): boolean;
   isRooted(id: string): boolean;
+  // util
+  walkUp(id: string): string[];
+  walkDown(id: string): string[];
   printTree(key: string, printout?: boolean): string;
   buildTreeString(key: string, node: Node, prefix?: string, isRoot?: boolean): string;
 }
 
 export function tree(ctx: CaudexCtx, base: BaseAPI): TreeAPI {
   const { store } = ctx;
-  const { checkLock, has, get, all } = base;
+  const { checkLock, has, get, nodes } = base;
 
   // parent index — 'childId -> parentId', a derived cache over the tree's child
   // pointers so parent()/ancestors()/inTree() are O(1)/O(depth) instead of a full
@@ -103,7 +103,7 @@ export function tree(ctx: CaudexCtx, base: BaseAPI): TreeAPI {
     return get(ctx.root, opts !== undefined ? opts : { payload: QUERY_TYPE.ID });
   }
 
-  // note: the phase bulk queries (phases/integrated/orphans/wallflowers/
+  // note: the phase bulk queries (phases/integrated/orphans/spurs/
   // isolates) live in phase.ts, and per-node phase on the node itself
   // ('node.phase()') -- phase partitions nodes across BOTH the tree and web
   // attachment axes. (the old tree-only 'orphans(treeIDs)' -- "leaf with no
@@ -225,10 +225,10 @@ export function tree(ctx: CaudexCtx, base: BaseAPI): TreeAPI {
     // tree-kind change. (It does NOT touch web attr/link/embed data, so it must
     // NOT stale backRefsIndex — tree-kind leaves web-scoped indexes alone.)
     store.signal({ kind: 'tree', op: 'flushTree' });
-    for (const node of (all({ payload: QUERY_TYPE.NODE }) as Node[] ?? [])) {
+    for (const node of (nodes({ payload: QUERY_TYPE.NODE }) as Node[] ?? [])) {
       const isZombie: boolean = (node.state() === NODE.STATE.ZOMBIE);
       /* eslint-disable indent */
-      const hasRelRef: boolean = (all({ payload: QUERY_TYPE.NODE }) as Node[] ?? []).some((relNode) =>
+      const hasRelRef: boolean = (nodes({ payload: QUERY_TYPE.NODE }) as Node[] ?? []).some((relNode) =>
                                           (relNode.id !== node.id)
                                           &&
                                           (relNode.inAttrs(node.id)

@@ -68,7 +68,7 @@ export class Node {
     }
     const inTree: boolean = this.#graph.inTree(this.id);
     const inWeb: boolean = this.#graph.inWeb(this.id);
-    return inTree ? (inWeb ? NODE.PHASE.INTEGRATED : NODE.PHASE.WALLFLOWER) : (inWeb ? NODE.PHASE.ORPHAN : NODE.PHASE.ISOLATE);
+    return inTree ? (inWeb ? NODE.PHASE.INTEGRATED : NODE.PHASE.SPUR) : (inWeb ? NODE.PHASE.ORPHAN : NODE.PHASE.ISOLATE);
   }
 
   public flush(kind?: DATA_STRUCT): void {

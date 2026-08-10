@@ -551,11 +551,11 @@ describe('use-case', () => {
   //   phase -- tree x web attachment, one EXCLUSIVE cell per live doc:
   //
   //                    in web        not in web
-  //     in tree      integrated     wallflower
+  //     in tree      integrated     spur
   //     not in tree    orphan         isolate
   //
   // a brand-new, unplaced, unreferenced file is an isolate; graft it and it's a
-  // wallflower; link it instead and it's an orphan; do both and it's integrated.
+  // spur; link it instead and it's an orphan; do both and it's integrated.
   // ===========================================================================
 
   describe('create a dangling link (zombie)', () => {
@@ -668,7 +668,7 @@ describe('use-case', () => {
   // inspect the garden (health checks)
   //
   // the diagnostics a PKM surfaces to the user (cf. tendr-cli `list` / `check` /
-  // `status`): the phase cells (orphans / wallflowers / isolates /
+  // `status`): the phase cells (orphans / spurs / isolates /
   // integrated) and dangling links (zombies).
   // ---------------------------------------------------------------------------
 
@@ -687,10 +687,10 @@ describe('use-case', () => {
       assert.deepEqual(wb.isolates(), ['4']);
     });
 
-    it('lists wallflowers -- docs in the tree but unreferenced in the web', () => {
+    it('lists spurs -- docs in the tree but unreferenced in the web', () => {
       // link `one` -> `two`; `three`/`four` stay tree-placed with no web refs
       wb.connect('1', '2', EDGE.KIND.LINK, 'linktype');
-      assert.deepEqual(wb.wallflowers(), ['3', '4']);
+      assert.deepEqual(wb.spurs(), ['3', '4']);
     });
 
     it('phases() -- the whole 2x2 at once', () => {
@@ -699,7 +699,7 @@ describe('use-case', () => {
       assert.deepEqual(wb.phases(), {
         [NODE.PHASE.ISOLATE]: ['4'],
         [NODE.PHASE.ORPHAN]: [],
-        [NODE.PHASE.WALLFLOWER]: ['3'],
+        [NODE.PHASE.SPUR]: ['3'],
         [NODE.PHASE.INTEGRATED]: ['1', '2'],
       });
     });
@@ -726,12 +726,12 @@ describe('use-case', () => {
       assert.ok(!(wb.isolates() as string[]).includes('4'));
     });
 
-    it('wallflower: in the index, yet referenced by nothing', () => {
+    it('spur: in the index, yet referenced by nothing', () => {
       // give the other nodes web refs; `four` stays a tree leaf with no refs
       wb.connect('1', '2', EDGE.KIND.LINK, 'linktype');
       wb.connect('3', '1', EDGE.KIND.LINK, 'linktype');
-      assert.strictEqual(wb.get('4').phase(), NODE.PHASE.WALLFLOWER);
-      assert.ok((wb.wallflowers() as string[]).includes('4'));
+      assert.strictEqual(wb.get('4').phase(), NODE.PHASE.SPUR);
+      assert.ok((wb.spurs() as string[]).includes('4'));
       assert.ok(!(wb.isolates() as string[]).includes('4'));
       assert.ok(!(wb.orphans() as string[]).includes('4'));
     });

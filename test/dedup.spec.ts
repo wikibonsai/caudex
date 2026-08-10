@@ -86,7 +86,7 @@ describe('duplicate handling', () => {
         { id: '4', uri: 'uc', filename: 'c' },
       ]), { ...OPTS, onInitError: 'collect' });
       // no throw; a, b, c indexed
-      assert.strictEqual((wb.all() as string[]).length, 3);
+      assert.strictEqual((wb.nodes() as string[]).length, 3);
       assert.ok(wb.find('filename', 'a'));
       assert.ok(wb.find('filename', 'b'));
       assert.ok(wb.find('filename', 'c'));
@@ -101,7 +101,7 @@ describe('duplicate handling', () => {
         { id: 'DUP', uri: 'ua', filename: 'a' },
         { id: 'DUP', uri: 'ub', filename: 'b' }, // same id, distinct filename
       ]), { ...OPTS, onInitError: 'collect' });
-      assert.strictEqual((wb.all() as string[]).length, 1); // only the first
+      assert.strictEqual((wb.nodes() as string[]).length, 1); // only the first
       assert.strictEqual(wb.initErrors.length, 1);
       assert.strictEqual(wb.initErrors[0].reason, 'id');
       // the recorded item still carries its data so a consumer can re-add it
@@ -114,7 +114,7 @@ describe('duplicate handling', () => {
         { id: '2', uri: 'ub', filename: 'b' },
       ]), { ...OPTS, onInitError: 'collect' });
       assert.strictEqual(wb.initErrors.length, 0);
-      assert.strictEqual((wb.all() as string[]).length, 2);
+      assert.strictEqual((wb.nodes() as string[]).length, 2);
     });
 
     it('a consumer can re-add a dropped id-collision item with a fresh id (app policy)', () => {
@@ -126,7 +126,7 @@ describe('duplicate handling', () => {
       for (const err of wb.initErrors) {
         if (err.reason === 'id') { wb.add(err.item.data); }
       }
-      assert.strictEqual((wb.all() as string[]).length, 2);
+      assert.strictEqual((wb.nodes() as string[]).length, 2);
       assert.ok(wb.find('filename', 'a'));
       assert.ok(wb.find('filename', 'b'));
     });

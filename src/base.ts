@@ -62,7 +62,7 @@ export interface BaseAPI {
   onMutate(op?: string, id?: string): void;
   print(printout?: boolean): string;
   // properties
-  all(opts?: QueryOpts): string[] | Node[] | any[] | undefined;
+  nodes(opts?: QueryOpts): string[] | Node[] | any[] | undefined;
   nodetypes(): Set<string>;
   edgetypes(): Set<string>;
   zombies(opts?: QueryOpts): string[] | Node[] | any[] | undefined;
@@ -244,19 +244,19 @@ export function base(ctx: CaudexCtx): BaseAPI {
     return execQuery(id, payload);
   }
 
-  function all(opts?: QueryOpts): string[] | Node[] | any[] | undefined {
+  function nodes(opts?: QueryOpts): string[] | Node[] | any[] | undefined {
     checkLock();
     const payload: PayloadOpt = opts?.payload ?? QUERY_TYPE.ID;
-    let nodes: Node[] = store.all();
-    nodes = applyFilter(nodes, opts?.filter);
-    return nodes.map((node: Node) => resolvePayload(node.id, payload, node));
+    let nodeList: Node[] = store.all();
+    nodeList = applyFilter(nodeList, opts?.filter);
+    return nodeList.map((node: Node) => resolvePayload(node.id, payload, node));
   }
 
   function nodetypes(): Set<string> {
     checkLock();
     /* eslint-disable indent */
-    const nodes = (all({ payload: QUERY_TYPE.NODE }) as Node[] | undefined) ?? [];
-    const types: string[] = nodes
+    const nodeList = (nodes({ payload: QUERY_TYPE.NODE }) as Node[] | undefined) ?? [];
+    const types: string[] = nodeList
       .filter((node) => (node.type !== undefined) && (node.type !== ''))
       .map((node) => node.type as string);
     /* eslint-enable indent */
@@ -283,7 +283,7 @@ export function base(ctx: CaudexCtx): BaseAPI {
   function zombies(opts?: QueryOpts): string[] | Node[] | any[] | undefined {
     checkLock();
     const mergedFilter = { ...opts?.filter, nodeState: NODE.STATE.ZOMBIE };
-    return all({ ...opts, filter: mergedFilter });
+    return nodes({ ...opts, filter: mergedFilter });
   }
 
   // index operations
@@ -303,7 +303,7 @@ export function base(ctx: CaudexCtx): BaseAPI {
       return true;
     // all
     } else {
-      (all({ payload: QUERY_TYPE.NODE }) as Node[] ?? []).forEach((node: Node) => {
+      (nodes({ payload: QUERY_TYPE.NODE }) as Node[] ?? []).forEach((node: Node) => {
         node.data = {};
       });
       return true;
@@ -313,7 +313,7 @@ export function base(ctx: CaudexCtx): BaseAPI {
   function flushGraph(): boolean {
     checkLock();
     onMutate('flushGraph');
-    for (const node of (all({ payload: QUERY_TYPE.NODE }) as Node[] ?? [])) {
+    for (const node of (nodes({ payload: QUERY_TYPE.NODE }) as Node[] ?? [])) {
       // delete zombies
       if (node.state() === NODE.STATE.ZOMBIE) {
         store.delete(node.id);
@@ -537,7 +537,7 @@ export function base(ctx: CaudexCtx): BaseAPI {
       return false;
     }
     onMutate('rm', id);
-    const hasRel: boolean = (all({ payload: QUERY_TYPE.NODE }) as Node[] ?? []).some((n) =>
+    const hasRel: boolean = (nodes({ payload: QUERY_TYPE.NODE }) as Node[] ?? []).some((n) =>
       (n.id !== id) && (n.inChildren(id) || n.inAttrs(id) || n.inLinks(id) || n.inEmbeds(id))
     );
     // if other nodes reference this node, just delete data
@@ -584,7 +584,7 @@ export function base(ctx: CaudexCtx): BaseAPI {
     graphCtx,
     onMutate,
     print,
-    all,
+    nodes,
     nodetypes,
     edgetypes,
     zombies,

@@ -14,7 +14,7 @@ import { create, Node, NODE, QUERY_TYPE, EDGE } from '../src/index';
 //     attachment), evaluated lazily against the graph via the context bound
 //     at node creation:
 //                     in web        not in web
-//     in tree     integrated       wallflower
+//     in tree     integrated       spur
 //     not in tree   orphan           isolate
 //
 // phase() reports truthfully for ANY node (a referenced zombie reads
@@ -25,7 +25,7 @@ import { create, Node, NODE, QUERY_TYPE, EDGE } from '../src/index';
 //   tree: 1 -> 2          web: 2 -> 3 (link)
 //   4: unconnected        z ('zzz'): zombie via add(string)
 //
-//   1 = wallflower (tree only)      2 = integrated (tree + web)
+//   1 = spur (tree only)      2 = integrated (tree + web)
 //   3 = orphan (web only)           4 = isolate (neither)
 
 let data: any;
@@ -96,7 +96,7 @@ describe('node state & phase', () => {
     it('filter opt nodeState; payload NODESTATE', () => {
       wb.add('zzz');
       assert.deepEqual(
-        wb.all({ filter: { nodeState: NODE.STATE.ZOMBIE } }),
+        wb.nodes({ filter: { nodeState: NODE.STATE.ZOMBIE } }),
         ['404'],
       );
       assert.strictEqual(wb.get('1', { payload: QUERY_TYPE.NODESTATE }), NODE.STATE.LIVE);
@@ -107,7 +107,7 @@ describe('node state & phase', () => {
   describe('phase() (the integration phase; derived from the graph)', () => {
 
     it('phase(); the 2x2', () => {
-      assert.strictEqual(wb.get('1').phase(), NODE.PHASE.WALLFLOWER);
+      assert.strictEqual(wb.get('1').phase(), NODE.PHASE.SPUR);
       assert.strictEqual(wb.get('2').phase(), NODE.PHASE.INTEGRATED);
       assert.strictEqual(wb.get('3').phase(), NODE.PHASE.ORPHAN);
       assert.strictEqual(wb.get('4').phase(), NODE.PHASE.ISOLATE);
@@ -148,13 +148,13 @@ describe('node state & phase', () => {
       assert.deepEqual(wb.phases(), {
         [NODE.PHASE.ISOLATE]: ['4'],
         [NODE.PHASE.ORPHAN]: ['3'],
-        [NODE.PHASE.WALLFLOWER]: ['1'],
+        [NODE.PHASE.SPUR]: ['1'],
         [NODE.PHASE.INTEGRATED]: ['2'],
       });
     });
 
     it('phase cell queries; each cell lists exactly its nodes', () => {
-      assert.deepEqual(wb.wallflowers(), ['1']);
+      assert.deepEqual(wb.spurs(), ['1']);
       assert.deepEqual(wb.integrated(), ['2']);
       assert.deepEqual(wb.orphans(), ['3']);
       assert.deepEqual(wb.isolates(), ['4']);
@@ -164,7 +164,7 @@ describe('node state & phase', () => {
       const zombie: Node = wb.add('zzz');
       wb.connect('1', zombie.id, EDGE.KIND.LINK, 'linktype');
       const all: string[] = [
-        ...wb.integrated(), ...wb.orphans(), ...wb.wallflowers(), ...wb.isolates(),
+        ...wb.integrated(), ...wb.orphans(), ...wb.spurs(), ...wb.isolates(),
       ];
       assert.strictEqual(all.includes(zombie.id), false);
     });
@@ -183,18 +183,18 @@ describe('node state & phase', () => {
       assert.strictEqual(wb.get('3').phase(), NODE.PHASE.INTEGRATED);
     });
 
-    it('connect; a wallflower with a reference becomes integrated', () => {
+    it('connect; a spur with a reference becomes integrated', () => {
       const one: Node = wb.get('1');
-      assert.strictEqual(one.phase(), NODE.PHASE.WALLFLOWER);   // warm
+      assert.strictEqual(one.phase(), NODE.PHASE.SPUR);   // warm
       wb.connect('4', '1', EDGE.KIND.LINK, 'linktype');
       // the SAME node object answers fresh -- state is never stored on it
       assert.strictEqual(one.phase(), NODE.PHASE.INTEGRATED);
     });
 
-    it('disconnect; integrated loses its last reference, back to wallflower', () => {
+    it('disconnect; integrated loses its last reference, back to spur', () => {
       assert.strictEqual(wb.get('2').phase(), NODE.PHASE.INTEGRATED);   // warm
       wb.disconnect('2', '3', EDGE.KIND.LINK, 'linktype');
-      assert.strictEqual(wb.get('2').phase(), NODE.PHASE.WALLFLOWER);
+      assert.strictEqual(wb.get('2').phase(), NODE.PHASE.SPUR);
     });
 
     it('scoped invalidation; a web-op leaves the tree-attachment index warm', () => {

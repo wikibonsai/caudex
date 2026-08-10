@@ -36,7 +36,7 @@ export interface WebAPI {
 
 export function web(ctx: CaudexCtx, base: BaseAPI): WebAPI {
   const { store } = ctx;
-  const { checkLock, has, get, all } = base;
+  const { checkLock, has, get, nodes } = base;
 
   // back-ref (inverse) index — a derived cache over the authoritative forward refs.
   // 'targetId -> Set<sourceId>' per ref kind. Registered against the store, so
@@ -99,7 +99,7 @@ export function web(ctx: CaudexCtx, base: BaseAPI): WebAPI {
 
   // properties
 
-  // note: the phase bulk queries (phases/integrated/orphans/wallflowers/
+  // note: the phase bulk queries (phases/integrated/orphans/spurs/
   // isolates) live in phase.ts, and per-node phase on the node itself
   // ('node.phase()') -- phase partitions nodes across BOTH the tree and web
   // attachment axes. (the old web-only 'isolates()' -- "no web neighbors" --
@@ -117,7 +117,7 @@ export function web(ctx: CaudexCtx, base: BaseAPI): WebAPI {
     checkLock();
     let types: string[] = [] as string[];
     /* eslint-disable indent */
-    (all({ payload: QUERY_TYPE.NODE }) as Node[] ?? []).forEach((node: Node) =>
+    (nodes({ payload: QUERY_TYPE.NODE }) as Node[] ?? []).forEach((node: Node) =>
           types = types.concat(Object.keys(node.attrs)
                                      .map((type) => type)));
     /* eslint-enable indent */
@@ -128,7 +128,7 @@ export function web(ctx: CaudexCtx, base: BaseAPI): WebAPI {
     checkLock();
     let types: string[] = [] as string[];
     /* eslint-disable indent */
-    (all({ payload: QUERY_TYPE.NODE }) as Node[] ?? []).forEach((node: Node) =>
+    (nodes({ payload: QUERY_TYPE.NODE }) as Node[] ?? []).forEach((node: Node) =>
           // @ts-expect-error: typescript is not smart enough to see 'filter' performing validation
           types = types.concat(node.links
                                    .filter((link: Link) => link !== undefined)
@@ -362,7 +362,7 @@ export function web(ctx: CaudexCtx, base: BaseAPI): WebAPI {
         const relRefNode: Node | undefined = get(relRefID, { payload: QUERY_TYPE.NODE });
         if (!relRefNode) { continue; }
         const isZombie: boolean = (relRefNode.state() === NODE.STATE.ZOMBIE);
-        const hasRel: boolean = (all({ payload: QUERY_TYPE.NODE }) as Node[] ?? []).some((n) =>
+        const hasRel: boolean = (nodes({ payload: QUERY_TYPE.NODE }) as Node[] ?? []).some((n) =>
           (n.id !== relRefID && n.inChildren(relRefID))
           || (n.id !== relRefID && n.id !== id && (n.inAttrs(relRefID) || n.inLinks(relRefID) || n.inEmbeds(relRefID)))
         );
@@ -377,9 +377,9 @@ export function web(ctx: CaudexCtx, base: BaseAPI): WebAPI {
       return true;
     // all
     } else {
-      for (const node of (all({ payload: QUERY_TYPE.NODE }) as Node[] ?? [])) {
+      for (const node of (nodes({ payload: QUERY_TYPE.NODE }) as Node[] ?? [])) {
         const isZombie: boolean = (node.state() === NODE.STATE.ZOMBIE);
-        const hasFamRel: boolean = (all({ payload: QUERY_TYPE.NODE }) as Node[] ?? []).some((relNode) =>
+        const hasFamRel: boolean = (nodes({ payload: QUERY_TYPE.NODE }) as Node[] ?? []).some((relNode) =>
           (relNode.id !== node.id) && (relNode.inChildren(node.id))
         );
         // delete floater/orphaned zombies
@@ -547,7 +547,7 @@ export function web(ctx: CaudexCtx, base: BaseAPI): WebAPI {
     checkLock();
     store.signal({ kind: 'web', op: 'retype' });
     const retypes: boolean[] = [];
-    for (const node of (all({ payload: QUERY_TYPE.NODE }) as Node[] ?? [])) {
+    for (const node of (nodes({ payload: QUERY_TYPE.NODE }) as Node[] ?? [])) {
       if ((kind === EDGE.KIND.REF) || (kind === EDGE.KIND.ATTR)) {
         if (Object.keys(node.attrs).includes(oldType)
         && !Object.keys(node.attrs).includes(newType)) {

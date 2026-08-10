@@ -46,17 +46,20 @@ export namespace NODE {
   }
 
   // the node's integration phase -- tree x web attachment, a lifecycle of
-  // increasing connectedness: isolate -> orphan/wallflower -> integrated.
+  // increasing connectedness: isolate -> orphan/spur -> integrated.
   // DERIVED per-node from the graph ('node.phase()'); zombies are gated out of
   // the bulk queries by state.
   //
   //                 in web        not in web
-  //   in tree     integrated     wallflower
-  //   not in tree   orphan         isolate
+  //   in tree     integrated       spur
+  //   not in tree   orphan        isolate
   export enum PHASE {
     ISOLATE     = 'isolate',      // connected to nothing (a lone island)
     ORPHAN      = 'orphan',       // in the web, but no family in the tree
-    WALLFLOWER  = 'wallflower',   // in the tree, but no references in the web
+    SPUR        = 'spur',         // in the tree, but no references in the web
+                                  // (a spur: the dead-end branch line of network
+                                  // vocabulary -- and the short fruiting branch
+                                  // of orchard vocabulary; pears grow on spurs)
     INTEGRATED  = 'integrated',   // in the tree AND the web -- fully connected
   }
 }
