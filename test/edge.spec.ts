@@ -4,7 +4,7 @@ import sinon from 'sinon';
 import nanoid from 'nanoid';
 
 import type { Edge } from '../src/edge';
-import { Caudex, NODE, EDGE } from '../src/index';
+import { create, NODE, EDGE } from '../src/index';
 
 
 // the Edge object: web relations (attr / link / embed) reified as normalized
@@ -35,7 +35,7 @@ describe('edges (web relations, reified)', () => {
       { init: { id: '3' }, data: { uri: 'file://data/3', filename: 'three', title: 'Three' } },
       { init: { id: '4' }, data: { uri: 'file://data/4', filename: 'four', title: 'Four' } },
     ];
-    wb = new Caudex(data, { uniqKeys: ['uri', 'filename'], zombieKey: 'filename' });
+    wb = create(data, { uniqKeys: ['uri', 'filename'], zombieKey: 'filename' });
     wb.setRoot('1');
     wb.graft('1', '2');
   });
@@ -64,7 +64,7 @@ describe('edges (web relations, reified)', () => {
       wb.connect('1', '3', { kind: EDGE.KIND.LINK, type: 'linktype' });
       wb.connect('1', '3', { kind: EDGE.KIND.LINK, type: 'other', header: 'section-a' });
       wb.connect('1', '2', EDGE.KIND.ATTR, 'other');
-      // projector order: attrs, then links, then embeds per node
+      // derive order: attrs, then links, then embeds per node
       assert.deepEqual(wb.edges({ type: 'other' }), [
         { source: '1', target: '2', kind: EDGE.KIND.ATTR, type: 'other' },
         { source: '1', target: '3', kind: EDGE.KIND.LINK, type: 'other', header: 'section-a' },

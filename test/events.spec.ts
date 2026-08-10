@@ -4,7 +4,7 @@ import sinon from 'sinon';
 import nanoid from 'nanoid';
 
 import type { ChangeEvent } from '../src/store';
-import { Caudex, EDGE } from '../src/index';
+import { create, EDGE } from '../src/index';
 
 
 // mechanism tests for the typed change-event API (composition refactor, phase 4
@@ -33,7 +33,7 @@ describe('change events (mechanism)', () => {
       { init: { id: '3' }, data: { uri: 'file://data/3', filename: 'three', title: 'Three' } },
       { init: { id: '4' }, data: { uri: 'file://data/4', filename: 'four', title: 'Four' } },
     ];
-    wb = new Caudex(data, { uniqKeys: ['uri', 'filename'], zombieKey: 'filename' });
+    wb = create(data, { uniqKeys: ['uri', 'filename'], zombieKey: 'filename' });
     wb.setRoot('1');
     wb.graft('1', '2');
     wb.graft('2', '3');

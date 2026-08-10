@@ -1,10 +1,9 @@
 import assert from 'node:assert';
 
-import { Base } from '../src/base';
-import { Tree } from '../src/tree';
+import { createTree } from '../src/tree';
 
 
-const Bonsai = Tree(Base);
+
 let data: any;
 let bonsai: any;
 
@@ -97,7 +96,7 @@ describe('big tree', () => {
       uniqKeys: ['uri', 'filename'],
       zombieKey: 'filename',
     };
-    bonsai = new Bonsai(data, opts);
+    bonsai = createTree(data, opts);
     // specific setup
     /*      1
      *      |

@@ -39,7 +39,7 @@ export interface EdgeQueryOpts {
 
 // projector for the edges view: flatten every node's forward refs into Edge
 // objects, in index-insertion order (attrs, then links, then embeds per node).
-export const edgesProjector = (store: StoragePort): Edge[] => {
+export const deriveEdges = (store: StoragePort): Edge[] => {
   const edges: Edge[] = [];
   for (const node of store.all()) {
     for (const [type, targetIDs] of Object.entries(node.attrs)) {

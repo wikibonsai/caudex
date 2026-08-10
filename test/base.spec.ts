@@ -4,7 +4,7 @@ import sinon from 'sinon';
 import nanoid from 'nanoid';
 
 import type { Attrs, Embeds, Links } from '../src/types';
-import { Base, Node, NODE, QUERY_TYPE } from '../src/index';
+import { Base, createBase, Node, NODE, QUERY_TYPE } from '../src/index';
 
 
 let data: any;
@@ -44,7 +44,7 @@ describe('base', () => {
       uniqKeys: ['uri', 'filename'],
       zombieKey: 'filename',
     };
-    base = new Base(data, opts);
+    base = createBase(data, opts);
   });
 
   afterEach(() => {
@@ -193,7 +193,7 @@ describe('base', () => {
           { init: { id: '4' }, data: { uri: 'file://data/4', filename: 'four', title: 'Four', headers: [] } },
         ];
         const opts: any = { uniqKeys: ['uri', 'filename'], zombieKey: 'filename' };
-        base = new Base(filterData, opts);
+        base = createBase(filterData, opts);
         base.index['1'].type = 'entry';
         base.index['2'].type = 'index';
         base.index['4'].type = 'entry';
@@ -246,7 +246,7 @@ describe('base', () => {
           { init: { id: '4' }, data: { uri: 'file://data/4', filename: 'four', title: 'Four', headers: [] } },
         ];
         const opts: any = { uniqKeys: ['uri', 'filename'], zombieKey: 'filename' };
-        base = new Base(payloadData, opts);
+        base = createBase(payloadData, opts);
       });
 
       it('payload id (default)', () => {

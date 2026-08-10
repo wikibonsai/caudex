@@ -1,7 +1,7 @@
 import assert from 'node:assert';
 
 import type { Attrs, Embeds, Links } from '../src/types';
-import { Caudex, Node, NODE, QUERY_TYPE } from '../src/index';
+import { create, Node, NODE, QUERY_TYPE } from '../src/index';
 
 
 let data: any;
@@ -46,7 +46,7 @@ describe('full caudex', () => {
       uniqKeys: ['uri', 'filename'],
       zombieKey: 'filename',
     };
-    wb = new Caudex(data, opts);
+    wb = create(data, opts);
     wb.setRoot('1');
   });
 

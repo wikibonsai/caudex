@@ -4,14 +4,14 @@ import sinon from 'sinon';
 import nanoid from 'nanoid';
 
 import { NODE, EDGE } from '../src/const';
-import { Base } from '../src/base';
+import { Base, createBase } from '../src/base';
 import { Node } from '../src/node';
-import { Tree } from '../src/tree';
-import { Web } from '../src/web';
+import { createTree } from '../src/tree';
+import { createWeb } from '../src/web';
 
 
-const Bonsai = Tree(Base);
-const Wiki = Web(Base);
+
+
 let locky: Base;
 let lockyBonsai: any;
 let lockyWiki: any;
@@ -57,7 +57,7 @@ describe('async mutex locking', () => {
         uniqKeys: ['uri', 'filename'],
         zombieKey: 'filename',
       };
-      locky = new Base(data, opts);
+      locky = createBase(data, opts);
     });
   
     afterEach(() => {
@@ -203,7 +203,7 @@ describe('async mutex locking', () => {
         uniqKeys: ['uri', 'filename'],
         zombieKey: 'filename',
       };
-      lockyBonsai = new Bonsai(data, opts);
+      lockyBonsai = createTree(data, opts);
       // tree-specific setup
       /*     1
         *    |
@@ -345,7 +345,7 @@ describe('async mutex locking', () => {
         uniqKeys: ['uri', 'filename'],
         zombieKey: 'filename',
       };
-      lockyWiki = new Wiki(data, opts);
+      lockyWiki = createWeb(data, opts);
     });
   
     afterEach(() => {

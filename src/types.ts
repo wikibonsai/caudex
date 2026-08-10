@@ -1,11 +1,7 @@
 import { NODE, EDGE, QUERY_TYPE } from './const';
-import { Base } from './base';
 
-
-// mixin utils
-// docs: https://www.typescriptlang.org/docs/handbook/mixins.html#constrained-mixins
-type Constructor<T = Record<string, unknown>> = new (...args: any[]) => T;
-export type Mixin = Constructor<Base>;
+// (the old mixin-utils 'Mixin' type retired with the class/mixin chain --
+// composition is now layer FUNCTIONS over a shared context; see base.ts.)
 
 export interface CaudexOpts {
   nanoid?: {

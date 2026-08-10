@@ -5,13 +5,12 @@ import nanoid from 'nanoid';
 
 import { NODE, QUERY_TYPE } from '../src/const';
 import { Node } from '../src/node';
-import { Base } from '../src/base';
-import { Tree } from '../src/tree';
+import { createTree } from '../src/tree';
 
 
 // todo: test 'treeLevel' === -1 for nodes not in the tree.
 
-const Bonsai = Tree(Base);
+
 let data: any;
 let bonsai: any;
 let fakeConsoleWarn: any;
@@ -79,7 +78,7 @@ describe('tree', () => {
       uniqKeys: ['uri', 'filename'],
       zombieKey: 'filename',
     };
-    bonsai = new Bonsai(data, opts);
+    bonsai = createTree(data, opts);
     // tree-specific setup
     /*
     *    1
@@ -140,7 +139,7 @@ describe('tree', () => {
       const initOpts =  {
         uniqKeys: ['uri', 'filename']
       };
-      const initBonsai: any = new Bonsai(initData, initOpts);
+      const initBonsai: any = createTree(initData, initOpts);
       /*
        *    1
        *    |
@@ -689,7 +688,7 @@ describe('tree', () => {
               },
             }
           ];
-          const errorBonsai = new Bonsai(smallItem);
+          const errorBonsai = createTree(smallItem);
           assert.strictEqual(errorBonsai.root(), undefined);
         });
 
@@ -1125,13 +1124,13 @@ describe('tree', () => {
 
         it('invalid tree; empty tree', () => {
           // before
-          const emptyBonsai = new Bonsai([], {});
+          const emptyBonsai = createTree([], {});
           // go
           assert.strictEqual(emptyBonsai.isTree(), false);
         });
 
         it('invalid tree; cycle', () => {
-          const cyclicTree = new Bonsai([
+          const cyclicTree = createTree([
             { init: { id: '1' }, data: { filename: 'one' } },
             { init: { id: '2' }, data: { filename: 'two' } },
             { init: { id: '3' }, data: { filename: 'three' } },
@@ -1148,7 +1147,7 @@ describe('tree', () => {
         });
     
         it('invalid tree; duplicate nodes', () => {
-          const duplicateTree = new Bonsai([
+          const duplicateTree = createTree([
             { init: { id: '1' }, data: { filename: 'one' } },
             { init: { id: '2' }, data: { filename: 'two' } },
           ]);
@@ -1163,7 +1162,7 @@ describe('tree', () => {
         });
 
         it('invalid tree; missing nodes', () => {
-          const missingNodeTree = new Bonsai([
+          const missingNodeTree = createTree([
             { init: { id: '1' }, data: { filename: 'one' } },
           ]);
           missingNodeTree.setRoot('1');
@@ -1195,7 +1194,7 @@ describe('tree', () => {
 
         it('default', () => {
           // setup
-          const treeBonsai = new Bonsai([
+          const treeBonsai = createTree([
             { init: { id: 'A' }, data: { title: 'Root' } },
             { init: { id: 'B' }, data: { title: 'Child 1' } },
             { init: { id: 'C' }, data: { title: 'Child 2' } },
@@ -1222,7 +1221,7 @@ describe('tree', () => {
 
         it('missing data', () => {
           // setup
-          const missingDataBonsai = new Bonsai([
+          const missingDataBonsai = createTree([
             { init: { id: 'A' }, data: { title: 'Root' } },
             { init: { id: 'B' }, data: {} },  // Missing title
             { init: { id: 'C' }, data: { title: 'Child 2' } },
@@ -1242,7 +1241,7 @@ describe('tree', () => {
 
         it('error; root undefined', () => {
           // go
-          const emptyBonsai = new Bonsai([]);
+          const emptyBonsai = createTree([]);
           // assert
           assert.throws(() => {
             emptyBonsai.printTree('title');

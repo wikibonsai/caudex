@@ -39,36 +39,36 @@ export interface StoragePort {
   indexKey(key: string, value: any, id: string): void;
   deindexKey(key: string, value: any): void;
   serialize(): string;
-  defineIndex<T>(name: string, projector: (store: StoragePort) => T, opts?: DefineIndexOpts): DerivedIndex<T>;
+  defineIndex<T>(name: string, derive: (store: StoragePort) => T, opts?: DefineIndexOpts): DerivedIndex<T>;
   invalidateIndexes(): void;
   signal(event: ChangeEvent): void;
   onChange(listener: ChangeListener): () => void;
 }
 
 // a lazily-(re)built cache derived from the node store. Each instance supplies
-// only its unique part -- the 'projector', a pure function '(store) -> cache' --
+// only its unique part -- the 'derive', a pure function '(store) -> cache' --
 // while the dirty / rebuild / ensure lifecycle (previously copy-pasted per index
-// across the tree + web mixins) lives here once. Registered via
+// across the tree + web layers) lives here once. Registered via
 // 'store.defineIndex()' so a store-level mutation signal ('invalidateIndexes')
 // sweeps every index without each one hooking the mutation path itself.
 export class DerivedIndex<T> {
   public readonly name: string;
   public readonly scopes: Set<ChangeKind>;
-  #projector: (store: StoragePort) => T;
+  #derive: (store: StoragePort) => T;
   #value: T | undefined;
   #dirty: boolean = true;
 
-  constructor(name: string, projector: (store: StoragePort) => T, scopes?: ChangeKind[]) {
+  constructor(name: string, derive: (store: StoragePort) => T, scopes?: ChangeKind[]) {
     this.name = name;
     this.scopes = new Set(scopes ?? ['node', 'tree', 'web']);
-    this.#projector = projector;
+    this.#derive = derive;
   }
 
   public get dirty(): boolean {
     return this.#dirty;
   }
 
-  // the current projection ('undefined' until first built); does NOT rebuild --
+  // the current derivation ('undefined' until first built); does NOT rebuild --
   // callers wanting freshness go through 'ensure()'.
   public get value(): T | undefined {
     return this.#value;
@@ -80,7 +80,7 @@ export class DerivedIndex<T> {
 
   // re-project unconditionally.
   public rebuild(store: StoragePort): T {
-    this.#value = this.#projector(store);
+    this.#value = this.#derive(store);
     this.#dirty = false;
     return this.#value;
   }
@@ -102,8 +102,9 @@ export class DerivedIndex<T> {
 // map -- de-indexing is an explicit, separate op ('deindexKey'), because some
 // core paths (e.g. zombie deletion in 'flushGraph') intentionally leave entries.
 //
-// truly-private fields are possible here -- unlike in the mixin chain
-// (see base.ts) -- because NodeStore stands outside it.
+// truly-private fields remain here as a class: NodeStore is the one stateful
+// collaborator (the StoragePort implementation), held by the layer functions'
+// shared context rather than composed into them.
 export class NodeStore implements StoragePort {
   #nodes: Record<string, Node> = {};
   #uniqKeyMap: Record<string, Record<string, string>> | undefined;
@@ -182,8 +183,8 @@ export class NodeStore implements StoragePort {
 
   // derived indexes
 
-  public defineIndex<T>(name: string, projector: (store: StoragePort) => T, opts?: DefineIndexOpts): DerivedIndex<T> {
-    const index: DerivedIndex<T> = new DerivedIndex<T>(name, projector, opts?.scopes);
+  public defineIndex<T>(name: string, derive: (store: StoragePort) => T, opts?: DefineIndexOpts): DerivedIndex<T> {
+    const index: DerivedIndex<T> = new DerivedIndex<T>(name, derive, opts?.scopes);
     this.#indexes.push(index);
     return index;
   }

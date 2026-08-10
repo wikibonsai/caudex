@@ -7,11 +7,11 @@ import type { Attrs, Embeds, Links } from '../src/types';
 import { NODE, QUERY_TYPE, EDGE } from '../src/const';
 const { LEVEL } = EDGE;
 import { Node } from '../src/node';
-import { Base } from '../src/base';
-import { Web } from '../src/web';
+import { createBase } from '../src/base';
+import { createWeb } from '../src/web';
 
 
-const Wiki = Web(Base);
+
 let data: any;
 let wiki: any;
 let fakeConsoleWarn: any;
@@ -69,7 +69,7 @@ describe('web', () => {
       uniqKeys: ['uri', 'filename'],
       zombieKey: 'filename',
     };
-    wiki = new Wiki(data, opts);
+    wiki = createWeb(data, opts);
   });
 
   afterEach(() => {

@@ -26,7 +26,7 @@ npm install caudex
 If you have some file data you want to store or index...
 
 ```js
-import { Caudex } from 'caudex';
+import { create } from 'caudex';
 
 let fileData = [
   {
@@ -38,35 +38,31 @@ let fileData = [
   },
   // ...
 ];
-const caudex = new Caudex(fileData);
+const caudex = create(fileData);
 ```
 
 ...Or just a web (graph):
 
 ```js
-import { Base } from './base';
-import { Web } from './web';
+import { createWeb } from 'caudex';
 
-class WebOnlyCaudex extends Web(Base) {}
-const web = new WebOnlyCaudex(fileData);
+const web = createWeb(fileData);
 ```
 
 ...Or just a tree:
 
 ```js
-import { Base } from './base';
-import { Tree } from './tree';
+import { createTree } from 'caudex';
 
-class TreeOnlyCaudex extends Tree(Base) {}
-const tree = new TreeOnlyCaudex(fileData);
+const tree = createTree(fileData);
 ```
 
 ### Partial init (duplicate / invalid items)
 
-By default the constructor throws if **any** item fails to add (e.g. two items share a `uniqKey` value, or a caller-supplied `init.id`). One malformed item aborts the whole batch — hostile to UI consumers. Pass `onInitError: 'collect'` to keep the good items and record the failures instead of throwing:
+By default the factory throws if **any** item fails to add (e.g. two items share a `uniqKey` value, or a caller-supplied `init.id`). One malformed item aborts the whole batch — hostile to UI consumers. Pass `onInitError: 'collect'` to keep the good items and record the failures instead of throwing:
 
 ```ts
-const caudex = new Caudex(fileData, { uniqKeys: ['filename'], onInitError: 'collect' });
+const caudex = create(fileData, { uniqKeys: ['filename'], onInitError: 'collect' });
 // every valid item is indexed; the rest are on `initErrors`:
 for (const { item, reason } of caudex.initErrors) {
   // reason: 'uniqkey' (duplicate uniqKey value) | 'id' (init.id collision) | 'invalid'
@@ -82,10 +78,10 @@ for (const { item, reason } of caudex.initErrors) {
 Caudex is synchronously implemented, but asynchronous access can be facilitated by turning on the `thread` option:
 
 ```js
-import { Caudex } from 'caudex';
+import { create } from 'caudex';
 
 let opts = { thread: { safe: true } };
-const caudex = new Caudex(fileData, opts);
+const caudex = create(fileData, opts);
 ```
 
 Then subsequent calls to `caudex` will use [mutex locks](https://github.com/DirtyHairy/async-mutex) to ensure atomic access to the internal index. (An optional `thread.timeout` in milliseconds wraps the lock with a timeout.) Remember to acquire the lock before performing actions on the caudex. For example, a call to [`has()`](https://github.com/wikibonsai/caudex?tab=readme-ov-file#hasid-string-boolean)...
@@ -125,20 +121,27 @@ The same events drive caudex's internal cache invalidation, so the `kind` is pre
 
 ## Terms
 
-There is some terminology that will help in understanding the innerworkings of the `caudex` as well as the internal variable name choice.
+The following is some terminology that will help in understanding the innerworkings of the `caudex` as well as the internal variable name choice.
 
 ### Data Structures
 
 - Base: The storage-facing layer -- owns the store (node ids -> nodes, unique-key lookups) and node crud (add/edit/remove), and signals change events.
-- Tree: A hierarchical structure; good for ordering information.
 - Web: A graph structure; good for associative traversal.
-- Phase: Cross-axis queries over both structures at once -- a node's integration phase requires seeing the tree *and* the web, so it sits atop the other layers (see "State & Phase").
+- Tree: A hierarchical structure; good for ordering information.
+- Phase: Cross-axis queries over both structures at once to determine a node's phase of integration, which requires seeing the tree _and_ the web, so it sits atop the other layers (see "State & Phase").
 
 Under the hood, the `caudex` is a **composition of semantic layers over one storage core**. The core (`NodeStore`, behind the `StoragePort` interface) owns the record of node ids -> nodes plus the unique-key lookups -- it is the single home of stored truth. Everything else the caudex knows is **derived**: the tree's parent index, the web's back-ref and edges views, and the phase layer's attachment sets are all `DerivedIndex` projections over the store -- lazily (re)built caches, invalidated precisely by the typed change events described above (a tree-only mutation stales only tree-scoped projections, and so on). The engine adapter on the roadmap swaps the store implementation without touching the layers -- the port is the seam.
 
 References between nodes mirror [pointers](https://en.wikipedia.org/wiki/Pointer_(computer_programming)), since [javascript/typescript doesn't have them](https://stackoverflow.com/questions/17382427/are-there-pointers-in-javascript#:~:text=No%2C%20JS%20doesn't%20have,the%20address%20of%20an%20object.): to "pass around a reference" you pass around a node id, and to "dereference" it you ask the caudex for the node (`get(id)`). Mirroring pointer behavior allows for implementing tree and graph data structures that are truer to form.
 
-The semantic layers are composed as mixins that can be used (or not) based on need -- `Tree(Base)`, `Web(Base)`, or the full `Caudex = Phase(Web(Tree(Base)))` for the hybrid tree-web structure. ("web" can be thought of as synonymous with the computer science "graph" data structure.) The mixin chain is how the layers are *organized*; the architectural seams are the storage port, the derived indexes, and the change events. Note that the layering is capability-based: each query lives in the lowest layer that can answer it -- which is why `zombies()` (pure state, no axes needed) sits in base while `phases()` (needs both axes) sits at the top.
+The semantic layers are composed as _functions over hashes_: each layer file exports a layer function (`base` / `tree` / `web` / `phase`) that closes over a shared context (the hash) and returns its API slice, and `compose` folds a layer list into the create-function:
+
+```ts
+const create = compose([base, tree, web, phase]);
+```
+[^sequential]
+
+`createTree(...)` and `createWeb(...)` are partial compositions of the same list, and the full `create(...)` is the hybrid web-tree structure. ("web" can be thought of as synonymous with the computer science "graph" data structure.) Encapsulation comes from closures rather than `private` keywords, and cross-layer wiring is explicit (later layers receive the base slice as an argument). The composition is how the layers are *organized*; the architectural seams are the storage port, the derived indexes, and the change events. Note that the layering is capability-based: each query lives in the lowest layer that can answer it -- which is why `zombies()` (pure state, no axes needed) sits in base while `phases()` (needs both axes) sits at the top.
 
 The "base" portion handles the storage-facing operations either structure needs -- adding, editing, or removing a node -- and signals a change event for every mutation.
 
@@ -259,7 +262,7 @@ The node's **integration phase** -- tree x web attachment, a lifecycle of increa
 
 Evaluated lazily against the caudex's attachment indexes via a graph context bound at node creation, so the same node object always answers fresh. Reported truthfully for any node -- a referenced zombie reads `orphan` (its `state()` stays `zombie`). A node constructed outside a caudex has no graph context: `phase()` throws; `state()` works standalone.
 
-The attachment indexes live in the `Phase` layer atop tree + web (`Caudex = Phase(Web(Tree(Base)))`) -- phase is a cross-axis concern, so tree-only or web-only compositions don't have it.
+The attachment indexes live in the phase layer atop tree + web (`create` composes base + tree + web + phase) -- phase is a cross-axis concern, so tree-only or web-only compositions don't have it.
 
 ##### `phases(): Record<NODE.PHASE, string[]>`
 
@@ -430,3 +433,4 @@ Disconnect a `source` node id from a `target` node id. Accepts the same position
 
 
 [^inspire]: Logo inspired by [databases](https://cdn-icons-png.flaticon.com/512/20/20093.png) and [caudexes](https://www.google.com/search?q=caudex&source=lnms&tbm=isch&sa=X&ved=2ahUKEwiD_LbPwr36AhUsRTABHdXOBq0Q_AUoAXoECAIQAw&biw=1011&bih=800&dpr=2) -- especially [this one](https://thumbs.dreamstime.com/z/adenium-shrub-branched-caudex-green-foliage-illustration-colored-pencils-229255411.jpg).
+[^sequential]: `compose()` probably smells a bit like `nn.Sequential(...)`, but in the declarative layers-in-a-list sense. The difference is that pytorch's stack transforms *data* flowing through at call time, while this stack extends the *API* at compose time: Each layer adds capabilities to the object rather than passing a tensor along.

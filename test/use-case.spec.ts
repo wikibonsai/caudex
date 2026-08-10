@@ -4,7 +4,7 @@ import sinon from 'sinon';
 import nanoid from 'nanoid';
 
 import type { Attrs, Embeds, Links } from '../src/types';
-import { Caudex, Node, NODE, EDGE } from '../src/index';
+import { create, Node, NODE, EDGE } from '../src/index';
 
 
 // use-case / workflow map
@@ -68,7 +68,7 @@ describe('use-case', () => {
       uniqKeys: ['uri', 'filename'],
       zombieKey: 'filename',
     };
-    wb = new Caudex(data, opts);
+    wb = create(data, opts);
     // the semtree / index rooted at 'one':
     //    1
     //   / \

@@ -3,7 +3,7 @@ import sinon from 'sinon';
 
 import nanoid from 'nanoid';
 
-import { Caudex } from '../src/index';
+import { create } from '../src/index';
 
 
 // duplicate-handling contract:
@@ -39,7 +39,7 @@ describe('duplicate handling', () => {
   describe('Task A -- add() is collision-safe on init.id', () => {
 
     it('rejects an init.id collision without overwriting the existing node', () => {
-      const wb: any = new Caudex(items([{ id: '1', uri: 'u1', filename: 'one', title: 'One' }]), OPTS);
+      const wb: any = create(items([{ id: '1', uri: 'u1', filename: 'one', title: 'One' }]), OPTS);
       const result = wb.add({ uri: 'u2', filename: 'two', title: 'Two' }, { id: '1' });
       // rejected, symmetric with the data.id guard
       assert.strictEqual(result, undefined);
@@ -53,7 +53,7 @@ describe('duplicate handling', () => {
     });
 
     it('the rejected path does not corrupt uniqKeyMap (a later, valid add still works)', () => {
-      const wb: any = new Caudex(items([{ id: '1', uri: 'u1', filename: 'one' }]), OPTS);
+      const wb: any = create(items([{ id: '1', uri: 'u1', filename: 'one' }]), OPTS);
       wb.add({ uri: 'u2', filename: 'two' }, { id: '1' });   // rejected
       const ok = wb.add({ uri: 'u3', filename: 'three' }, { id: '3' }); // valid
       assert.ok(ok);
@@ -61,7 +61,7 @@ describe('duplicate handling', () => {
     });
 
     it('a non-colliding init.id add is unaffected (regression)', () => {
-      const wb: any = new Caudex(items([{ id: '1', uri: 'u1', filename: 'one' }]), OPTS);
+      const wb: any = create(items([{ id: '1', uri: 'u1', filename: 'one' }]), OPTS);
       const node = wb.add({ uri: 'u2', filename: 'two' }, { id: '2' });
       assert.strictEqual(node?.id, '2');
       assert.strictEqual(wb.has('2'), true);
@@ -72,14 +72,14 @@ describe('duplicate handling', () => {
   describe('Task B -- constructor non-fatal failure mode', () => {
 
     it('default (throw) still aborts on a duplicate item (back-compat)', () => {
-      assert.throws(() => new Caudex(items([
+      assert.throws(() => create(items([
         { id: '1', uri: 'ua', filename: 'a' },
         { id: '2', uri: 'ub', filename: 'a' }, // duplicate filename
       ]), OPTS));
     });
 
     it('collect: indexes every other item and records the dropped one', () => {
-      const wb: any = new Caudex(items([
+      const wb: any = create(items([
         { id: '1', uri: 'ua', filename: 'a' },
         { id: '2', uri: 'ub', filename: 'b' },
         { id: '3', uri: 'ubooks', filename: 'b' }, // duplicate filename
@@ -97,7 +97,7 @@ describe('duplicate handling', () => {
     });
 
     it('collect: tags an id collision distinctly from a uniqKey collision', () => {
-      const wb: any = new Caudex(items([
+      const wb: any = create(items([
         { id: 'DUP', uri: 'ua', filename: 'a' },
         { id: 'DUP', uri: 'ub', filename: 'b' }, // same id, distinct filename
       ]), { ...OPTS, onInitError: 'collect' });
@@ -109,7 +109,7 @@ describe('duplicate handling', () => {
     });
 
     it('collect: leaves initErrors empty on a clean batch', () => {
-      const wb: any = new Caudex(items([
+      const wb: any = create(items([
         { id: '1', uri: 'ua', filename: 'a' },
         { id: '2', uri: 'ub', filename: 'b' },
       ]), { ...OPTS, onInitError: 'collect' });
@@ -118,7 +118,7 @@ describe('duplicate handling', () => {
     });
 
     it('a consumer can re-add a dropped id-collision item with a fresh id (app policy)', () => {
-      const wb: any = new Caudex(items([
+      const wb: any = create(items([
         { id: 'DUP', uri: 'ua', filename: 'a' },
         { id: 'DUP', uri: 'ub', filename: 'b' },
       ]), { ...OPTS, onInitError: 'collect' });

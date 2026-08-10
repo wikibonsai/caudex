@@ -4,7 +4,7 @@ import sinon from 'sinon';
 import nanoid from 'nanoid';
 
 import type { Attrs, Links } from '../src/types';
-import { Caudex, EDGE } from '../src/index';
+import { create, EDGE } from '../src/index';
 
 
 // mechanism tests for the back-ref (inverse) index.
@@ -30,7 +30,7 @@ describe('back-ref index (mechanism)', () => {
       { init: { id: '3' }, data: { uri: 'file://data/3', filename: 'three', title: 'Three' } },
       { init: { id: '4' }, data: { uri: 'file://data/4', filename: 'four', title: 'Four' } },
     ];
-    wb = new Caudex(data, { uniqKeys: ['uri', 'filename'], zombieKey: 'filename' });
+    wb = create(data, { uniqKeys: ['uri', 'filename'], zombieKey: 'filename' });
   });
 
   afterEach(() => {
