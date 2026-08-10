@@ -358,7 +358,9 @@ Return all linktypes in the caudex.
 
 #### Relational Properties
 
-##### (⚠️ coming soon!) `forerefs(id: string): Attrs | undefined`
+##### `forerefs(id: string): string[] | undefined`
+
+Returns node ids for **all** nodes the given node id references via any ref kind -- the union of `foreattrs` / `forelinks` / `foreembeds` targets (deduped; surveyed attr → link → embed). The mirror of `backrefs()`; read straight off the node's forward fields, no index needed.
 
 ##### `backrefs(id: string): string[] | undefined`
 

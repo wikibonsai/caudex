@@ -113,6 +113,55 @@ describe('web', () => {
     // semantics (degree-0 across BOTH axes) -- see state.spec.ts. Web(Base)
     // compositions no longer have it.
 
+    describe('forerefs / backrefs', () => {
+
+      it('union across all ref kinds (attr + link + embed)', () => {
+        wiki.connect('1', '2', EDGE.KIND.ATTR, 'attrtype');
+        wiki.connect('1', '3', EDGE.KIND.LINK, 'linktype');
+        wiki.connect('1', '4', EDGE.KIND.EMBED);
+        // forward: every node '1' references, any kind
+        assert.deepEqual(wiki.forerefs('1'), ['2', '3', '4']);
+        // back: the mirror -- every node referencing each target
+        assert.deepEqual(wiki.backrefs('2'), ['1']);
+        assert.deepEqual(wiki.backrefs('3'), ['1']);
+        assert.deepEqual(wiki.backrefs('4'), ['1']);
+      });
+
+      it('dedupes a target referenced via multiple kinds', () => {
+        wiki.connect('1', '2', EDGE.KIND.ATTR, 'attrtype');
+        wiki.connect('1', '2', EDGE.KIND.LINK, 'linktype');
+        wiki.connect('1', '2', EDGE.KIND.EMBED);
+        assert.deepEqual(wiki.forerefs('1'), ['2']);
+        assert.deepEqual(wiki.backrefs('2'), ['1']);
+      });
+
+      it('kind order: attrs, then links, then embeds', () => {
+        wiki.connect('1', '4', EDGE.KIND.EMBED);
+        wiki.connect('1', '3', EDGE.KIND.LINK, 'linktype');
+        wiki.connect('1', '2', EDGE.KIND.ATTR, 'attrtype');
+        // surveyed attr-first regardless of connect order
+        assert.deepEqual(wiki.forerefs('1'), ['2', '3', '4']);
+      });
+
+      it('payload', () => {
+        wiki.connect('1', '2', EDGE.KIND.ATTR, 'attrtype');
+        wiki.connect('1', '3', EDGE.KIND.LINK, 'linktype');
+        assert.deepEqual(wiki.forerefs('1', { payload: 'filename' }), ['two', 'three']);
+        assert.deepEqual(wiki.backrefs('2', { payload: 'filename' }), ['one']);
+      });
+
+      it('no refs yields empty', () => {
+        assert.deepEqual(wiki.forerefs('1'), []);
+        assert.deepEqual(wiki.backrefs('1'), []);
+      });
+
+      it('node does not exist', () => {
+        assert.strictEqual(wiki.forerefs('-1'), undefined);
+        assert.strictEqual(wiki.backrefs('-1'), undefined);
+      });
+
+    });
+
     describe('foreattrs / backattrs', () => {
 
       it('node exists', () => {

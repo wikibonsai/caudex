@@ -18,6 +18,7 @@ export interface WebAPI {
   attrtypes(): Set<string>;
   linktypes(): Set<string>;
   edges(opts?: EdgeQueryOpts): Edge[];
+  forerefs(id: string, opts?: QueryOpts): string[] | Node[] | any[] | undefined;
   backrefs(id: string, opts?: QueryOpts): string[] | Node[] | any[] | undefined;
   foreattrs(id: string, opts?: QueryOpts): Attrs | Record<string, Node[]> | Record<string, any> | undefined;
   backattrs(id: string, opts?: QueryOpts): Attrs | Record<string, Node[]> | Record<string, any> | undefined;
@@ -154,6 +155,26 @@ export function web(ctx: CaudexCtx, base: BaseAPI): WebAPI {
       && ((opts?.type === undefined) || (edge.type === opts.type))
       && ((opts?.header === undefined) || (edge.header === opts.header))
     );
+  }
+
+  // all nodes that `id` references via ANY ref kind (attr / link / embed) — the
+  // union of foreattrs/forelinks/foreembeds targets, read straight off the node's
+  // forward fields (no index needed: the forward refs ARE the authoritative
+  // storage). The mirror of backrefs() below; surveyed attr → link → embed to
+  // match the back-ref maps and the edges() view.
+  function forerefs(id: string, opts?: QueryOpts): string[] | Node[] | any[] | undefined {
+    checkLock();
+    if (!has(id)) { return undefined; }
+    const node: Node = get(id, { payload: QUERY_TYPE.NODE }) as Node;
+    const targets: Set<string> = new Set<string>();
+    for (const attrIDs of Object.values(node.attrs)) {
+      for (const targetID of attrIDs) { targets.add(targetID); }
+    }
+    for (const link of node.links) { targets.add(link.id); }
+    for (const embed of node.embeds) { targets.add(embed.id); }
+    const ids: string[] = [...targets];
+    const payload = opts?.payload ?? QUERY_TYPE.ID;
+    return (payload === QUERY_TYPE.ID || payload === undefined) ? ids : ids.map((tid) => get(tid, { ...opts, payload }));
   }
 
   // all nodes that reference `id` via ANY ref kind (attr / link / embed) — the union
@@ -624,6 +645,7 @@ export function web(ctx: CaudexCtx, base: BaseAPI): WebAPI {
     attrtypes,
     linktypes,
     edges,
+    forerefs,
     backrefs,
     foreattrs,
     backattrs,
