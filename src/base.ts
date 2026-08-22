@@ -80,6 +80,8 @@ export interface BaseAPI {
   get(id: string, opts?: QueryOpts): Node | any | undefined;
   execQuery(id: string, qType: string): any;
   find(key: any, value: any): Node | undefined;
+  resolve(name: string, opts?: QueryOpts): Node | any | undefined;
+  state(name: string): NODE.STATE;
   filter(key: any, value: any): Node[] | undefined;
   rm(id: string): boolean;
 }
@@ -510,6 +512,36 @@ export function base(ctx: CaudexCtx): BaseAPI {
     });
   }
 
+  // THE identity query: name -> node, walking the configured uniqKeys in
+  // priority order (first match wins). returns the node REGARDLESS of state --
+  // callers read 'node.state()'; 'undefined' = no node behind the name (void).
+  // ('find()' stays the generic single-key lookup; 'resolve()' is the semantic
+  // identity layer over it -- identity-index/aliases join here later, so every
+  // consumer inherits alias resolution for free. payload misses stay
+  // 'undefined' for EVERY payload, NODESTATE included -- 'state(name)' below
+  // is the one place the miss speaks 'void'.)
+  function resolve(name: string, opts?: QueryOpts): Node | any | undefined {
+    checkLock();
+    for (const key of store.uniqKeys) {
+      const node: Node | undefined = find(key, name);
+      if (node !== undefined) {
+        const payload: PayloadOpt = opts?.payload ?? QUERY_TYPE.NODE;
+        return resolvePayload(node.id, payload, node);
+      }
+    }
+    return undefined;
+  }
+
+  // the existence check for a NAME -- the full TERMS lifecycle in one answer:
+  // void -> zombie -> live. this is the ONE place caudex speaks 'void': there
+  // is no node to hold that state (state derives on nodes; the absence of the
+  // node IS the answer), so it can only appear as a query result. consumers
+  // translate to their own words (link-state etc.) at their layer.
+  function state(name: string): NODE.STATE {
+    const node: Node | any | undefined = resolve(name);
+    return (node === undefined) ? NODE.STATE.VOID : (node as Node).state();
+  }
+
   function filter(key: any, value: any): Node[] | undefined {
     checkLock();
     if (key === QUERY_TYPE.NODEKIND) {
@@ -600,6 +632,8 @@ export function base(ctx: CaudexCtx): BaseAPI {
     get,
     execQuery,
     find,
+    resolve,
+    state,
     filter,
     rm,
   };

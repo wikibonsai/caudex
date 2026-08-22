@@ -38,10 +38,15 @@ export namespace NODE {
     VIDEO       = 'video',
   }
 
-  // whether the document EXISTS (TERMS.md: zombie -> live).
+  // whether the document EXISTS (TERMS.md: void -> zombie -> live).
   // DERIVED from kind-absence ('node.state()'); never stored.
+  // VOID is the query-boundary answer only: a name with NO node behind it.
+  // no node ever holds it ('node.state()' never returns it) -- the absence
+  // of the node IS the answer, so it can only come from name-based queries
+  // ('caudex.state(name)').
   export enum STATE {
-    ZOMBIE      = 'zombie',       // no document exists (only references to it)
+    VOID        = 'void',         // no document exists, no references exist
+    ZOMBIE      = 'zombie',       // no document exists, references exist
     LIVE        = 'live',         // the document exists
   }
 
