@@ -59,7 +59,7 @@ const tree = createTree(fileData);
 
 ### Partial init (duplicate / invalid items)
 
-By default the factory throws if **any** item fails to add (e.g. two items share a `uniqKey` value, or a caller-supplied `init.id`). One malformed item aborts the whole batch — hostile to UI consumers. Pass `onInitError: 'collect'` to keep the good items and record the failures instead of throwing:
+By default the factory throws if **any** item fails to add (e.g. two items share a `uniqKey` value, or a caller-supplied `init.id`), so one malformed item aborts the whole batch. UI-based consumers usually want to keep the good items and surface the failures instead; pass `onInitError: 'collect'` for that:
 
 ```ts
 const caudex = create(fileData, { uniqKeys: ['filename'], onInitError: 'collect' });
@@ -71,7 +71,7 @@ for (const { item, reason } of caudex.initErrors) {
 }
 ```
 
-`onInitError` defaults to `'throw'` (back-compat). Related: `add()` never overwrites — a `data.id` **or** `init.id` collision warns and returns `undefined`, leaving the existing node untouched.
+`onInitError` defaults to `'throw'` (back-compat). Related: `add()` never overwrites; a `data.id` **or** `init.id` collision warns and returns `undefined`, leaving the existing node untouched.
 
 ### Async
 
@@ -109,9 +109,9 @@ Every mutation signals a typed change event through the caudex's `store`. Subscr
 ```ts
 const unsubscribe = caudex.store.onChange((e) => {
   // e: { kind: 'node' | 'tree' | 'web', op: string, id?: string }
-  //   'node' -- the node set changed    (add / rm / fill / flushGraph / clear)
-  //   'tree' -- the hierarchy changed   (graft / prune / replace / transplant / flushTree)
-  //   'web'  -- the relations changed   (connect / disconnect / retype / transfer / flushWeb)
+  //   'node': the node set changed    (add / rm / fill / flushGraph / clear)
+  //   'tree': the hierarchy changed   (graft / prune / replace / transplant / flushTree)
+  //   'web':  the relations changed   (connect / disconnect / retype / transfer / flushWeb)
 });
 // ...
 unsubscribe();
@@ -125,12 +125,12 @@ The following is some terminology that will help in understanding the innerworki
 
 ### Data Structures
 
-- Base: The storage-facing layer -- owns the store (node ids -> nodes, unique-key lookups) and node crud (add/edit/remove), and signals change events.
+- Base: The storage-facing layer. It owns the store (node ids -> nodes, unique-key lookups) and node crud (add/edit/remove), and signals change events.
 - Web: A graph structure; good for associative traversal.
 - Tree: A hierarchical structure; good for ordering information.
 - Phase: Cross-axis queries over both structures at once to determine a node's phase of integration, which requires seeing the tree _and_ the web, so it sits atop the other layers (see "State & Phase").
 
-Under the hood, the `caudex` is a **composition of semantic layers over one storage core**. The core (`NodeStore`, behind the `StoragePort` interface) owns the record of node ids -> nodes plus the unique-key lookups -- it is the single home of stored truth. Everything else the caudex knows is **derived**: the tree's parent index, the web's back-ref and edges views, and the phase layer's attachment sets are all `DerivedIndex` projections over the store -- lazily (re)built caches, invalidated precisely by the typed change events described above (a tree-only mutation stales only tree-scoped projections, and so on). The engine adapter on the roadmap swaps the store implementation without touching the layers -- the port is the seam.
+Under the hood, the `caudex` is a **composition of semantic layers over one storage core**. The core (`NodeStore`, behind the `StoragePort` interface) owns the record of node ids -> nodes plus the unique-key lookups: it is the single home of stored truth. Everything else the caudex knows is **derived**: the tree's parent index, the web's back-ref and edges views, and the phase layer's attachment sets are all `DerivedIndex` projections over the store: lazily (re)built caches, invalidated precisely by the typed change events described above (a tree-only mutation stales only tree-scoped projections, and so on). The engine adapter on the roadmap swaps the store implementation without touching the layers; the port is the seam.
 
 References between nodes mirror [pointers](https://en.wikipedia.org/wiki/Pointer_(computer_programming)), since [javascript/typescript doesn't have them](https://stackoverflow.com/questions/17382427/are-there-pointers-in-javascript#:~:text=No%2C%20JS%20doesn't%20have,the%20address%20of%20an%20object.): to "pass around a reference" you pass around a node id, and to "dereference" it you ask the caudex for the node (`get(id)`). Mirroring pointer behavior allows for implementing tree and graph data structures that are truer to form.
 
@@ -141,9 +141,9 @@ const create = compose([base, tree, web, phase]);
 ```
 [^sequential]
 
-`createTree(...)` and `createWeb(...)` are partial compositions of the same list, and the full `create(...)` is the hybrid web-tree structure. ("web" can be thought of as synonymous with the computer science "graph" data structure.) Encapsulation comes from closures rather than `private` keywords, and cross-layer wiring is explicit (later layers receive the base slice as an argument). The composition is how the layers are *organized*; the architectural seams are the storage port, the derived indexes, and the change events. Note that the layering is capability-based: each query lives in the lowest layer that can answer it -- which is why `zombies()` (pure state, no axes needed) sits in base while `phases()` (needs both axes) sits at the top.
+`createTree(...)` and `createWeb(...)` are partial compositions of the same list, and the full `create(...)` is the hybrid web-tree structure. ("web" can be thought of as synonymous with the computer science "graph" data structure.) Encapsulation comes from closures rather than `private` keywords, and cross-layer wiring is explicit (later layers receive the base slice as an argument). The composition is how the layers are *organized*; the architectural seams are the storage port, the derived indexes, and the change events. Note that the layering is capability-based: each query lives in the lowest layer that can answer it, which is why `zombies()` (pure state, no axes needed) sits in base while `phases()` (needs both axes) sits at the top.
 
-The "base" portion handles the storage-facing operations either structure needs -- adding, editing, or removing a node -- and signals a change event for every mutation.
+The "base" portion handles the storage-facing operations either structure needs (adding, editing, or removing a node) and signals a change event for every mutation.
 
 ### Function Kinds
 
@@ -151,9 +151,9 @@ The "base" portion handles the storage-facing operations either structure needs 
 - Relational Properties: Methods that return relationship information of some node(s).
 - Actions: Methods that perform some action on the caudex or some node(s).
 
-Every answer the caudex gives is either read from the store or derived from it on demand -- nothing queryable is cached anywhere it could go stale. It is helpful to think of each method as fitting into one of a few categories that dictate how it works and what it returns.
+Every answer the caudex gives is either read from the store or derived from it on demand; nothing queryable is cached anywhere it could go stale. It is helpful to think of each method as fitting into one of a few categories that dictate how it works and what it returns.
 
-"Properties" are methods that describe the state of the `caudex`. For example, `nodes()` returns all of the node ids that currently exist and `nodetypes()`/`edgetypes()` return the open type vocabularies in use. A few properties live on the *node* rather than the caudex -- `node.state()` and `node.phase()` -- and are likewise derived at call time (phase reads the graph through a context bound at the node's creation).
+"Properties" are methods that describe the state of the `caudex`. For example, `nodes()` returns all of the node ids that currently exist and `nodetypes()`/`edgetypes()` return the open type vocabularies in use. A few properties (`node.state()` and `node.phase()`) live on the *node* rather than the caudex and are likewise derived at call time (phase reads the graph through a context bound at the node's creation).
 
 "Relational properties" are methods that describe relationships between nodes and often take an `id: string` argument. For example, `ancestors(id: string)` returns an array of node ids that form the ancestry of the node with the given `id` and `backlinks(id: string)` returns an array of node ids who contain the node with the given `id` in its links. Inverse queries like these are backed by the derived indexes, so they are index-lookups, not full scans.
 
@@ -181,15 +181,15 @@ Returns all node ids in the caudex.
 
 ##### `nodetypes(): Set<string>`
 
-Returns every node type in the caudex -- the open `NODE.TYPE` vocabulary (doctypes).
+Returns every node type in the caudex: the open `NODE.TYPE` vocabulary (doctypes).
 
 ##### `edgetypes(): Set<string>`
 
-Returns every edge type in the caudex -- the open `EDGE.TYPE` vocabulary (reftypes): attr types + link types (embeds are untyped). Pairs with `nodetypes()`; supersedes the old web-only `reftypes()`. For kind-scoped surveys see `attrtypes()` / `linktypes()`.
+Returns every edge type in the caudex, the open `EDGE.TYPE` vocabulary (reftypes): attr types + link types (embeds are untyped). Pairs with `nodetypes()`; supersedes the old web-only `reftypes()`. For kind-scoped surveys see `attrtypes()` / `linktypes()`.
 
 ##### `zombies(): string[]`
 
-Returns an array of node ids for all zombie nodes in the caudex. (A zombie is a node whose **state** is `zombie` -- a reference with no document behind it. State derives from kind-absence: `kind` is `undefined` until `fill()`ed live -- see `node.state()`.)
+Returns an array of node ids for all zombie nodes in the caudex. (A zombie is a node whose **state** is `zombie`: a reference with no document behind it. State derives from kind-absence, where `kind` is `undefined` until `fill()`ed live; see `node.state()`.)
 
 #### Actions
 
@@ -203,7 +203,7 @@ Flushes / deletes node data. If no `id` is given, all data for all nodes is dele
 
 ##### `flushGraph(): boolean`
 
-Flushes every relationship in the caudex -- both the tree axis (children) and the web axis (attrs / links / embeds). Nodes and their data are untouched; zombie nodes (which exist only to be referenced) are deleted.
+Flushes every relationship in the caudex: both the tree axis (children) and the web axis (attrs / links / embeds). Nodes and their data are untouched; zombie nodes (which exist only to be referenced) are deleted.
 
 ##### `clear(): void`
 
@@ -233,6 +233,18 @@ Find a node in the caudex where it has a given `key` with the given `value` in i
 
 This action requires that the `key` is one of the caudex's `uniqDataKeys`. If is not, try using `filter` instead.
 
+##### `resolve(name: string[, opts: QueryOpts]): Node | undefined`
+
+**The identity query**: resolve a name to its node, walking the caudex's `uniqKeys` in priority order (first match wins). Returns the node **regardless of state**; callers read `node.state()`, and `undefined` means there is no node behind the name at all. (`find()` stays the generic single-key lookup; `resolve()` is the semantic identity layer over it, and is where identity-index / alias resolution joins later, so every consumer inherits alias resolution for free.)
+
+An optional `payload` rides `QueryOpts` just like `get()`. Payload misses stay `undefined` for every payload, `NODESTATE` included; `state(name)` below is the one query whose miss speaks `void`.
+
+##### `state(name: string): NODE.STATE`
+
+The name-based **existence check**: the full lifecycle (`void` -> `zombie` -> `live`) in one answer. Resolves the name (via `resolve()`) and returns the node's `state()`, or `NODE.STATE.VOID` when no node exists behind the name.
+
+This is the one place the caudex speaks `void`: no node ever holds it (state derives *on* nodes, and the absence of a node **is** the answer), so it can only ever appear as a query result. Consumers translate to their own words (link-state etc.) at their layer.
+
 ##### `filter(key: any, value: any): Node[] | undefined`
 
 Find all nodes in the caudex whose given `key` matches the given `value`. Returns an array of nodes with valid matches and `undefined` if none are found.
@@ -249,20 +261,22 @@ A node's state and phase are fully **derived, never stored**:
 
 ##### `node.state(): NODE.STATE`
 
-Whether the document **exists**: `zombie` -> `live`. Derived from kind-absence (`kind` is `undefined` until `fill()`ed live). Graph-free -- works on any node.
+Whether the document **exists**: `zombie` -> `live`. Derived from kind-absence (`kind` is `undefined` until `fill()`ed live). Graph-free: works on any node.
+
+(The full lifecycle is `void` -> `zombie` -> `live`, but `node.state()` never returns `void`, since a node existing at all precludes it. The name-based `state(name)` query is where `void` appears.)
 
 ##### `node.phase(): NODE.PHASE`
 
-The node's **integration phase** -- tree x web attachment, a lifecycle of increasing connectedness:
+The node's **integration phase** (tree x web attachment), a lifecycle of increasing connectedness:
 
 |                 | in web       | not in web   |
 |-----------------|--------------|--------------|
 | **in tree**     | `integrated` | `spur` |
 | **not in tree** | `orphan`     | `isolate`    |
 
-Evaluated lazily against the caudex's attachment indexes via a graph context bound at node creation, so the same node object always answers fresh. Reported truthfully for any node -- a referenced zombie reads `orphan` (its `state()` stays `zombie`). A node constructed outside a caudex has no graph context: `phase()` throws; `state()` works standalone.
+Evaluated lazily against the caudex's attachment indexes via a graph context bound at node creation, so the same node object always answers fresh. Reported truthfully for any node: a referenced zombie reads `orphan` (its `state()` stays `zombie`). A node constructed outside a caudex has no graph context: `phase()` throws; `state()` works standalone.
 
-The attachment indexes live in the phase layer atop tree + web (`create` composes base + tree + web + phase) -- phase is a cross-axis concern, so tree-only or web-only compositions don't have it.
+The attachment indexes live in the phase layer atop tree + web (`create` composes base + tree + web + phase); phase is a cross-axis concern, so tree-only or web-only compositions don't have it.
 
 ##### `phases(): Record<NODE.PHASE, string[]>`
 
@@ -270,7 +284,7 @@ Returns the whole 2x2 in one pass: every **live** node id sorted into its phase 
 
 ##### `integrated()` / `orphans()` / `spurs()` / `isolates()`
 
-Each returns one cell of `phases()`. (Note: `orphans` and `isolates` used to live on tree/web with single-axis meanings -- "leaf with no parent" and "no web neighbors" respectively; those retired with the TERMS reorg.)
+Each returns one cell of `phases()`. (Note: `orphans` and `isolates` used to live on tree/web with single-axis meanings ("leaf with no parent" and "no web neighbors" respectively); those retired with the TERMS reorg.)
 
 ### Tree
 
@@ -346,7 +360,7 @@ Print the tree to the console.
 
 ##### `edges(opts?: { source?, target?, kind?, type?, header? }): Edge[]`
 
-Every web connection reified as a normalized `Edge` object -- `{ source, target, kind, type?, header?, media?, position? }` and optionally filtered by `source` / `target` / `kind` / `type` / `header`. `position` is the occurrence anchor (character offset of the ref in the source doc): two otherwise-identical links at different positions are distinct occurrences, and context snippets / block-level citation derive from it (store the anchor, derive the sentence). This is a derived view over the node-owned forward refs; storage reification rides the engine adapter.
+Every web connection reified as a normalized `Edge` object (`{ source, target, kind, type?, header?, media?, position? }`), optionally filtered by `source` / `target` / `kind` / `type` / `header`. `position` is the occurrence anchor (character offset of the ref in the source doc): two otherwise-identical links at different positions are distinct occurrences, and context snippets / block-level citation derive from it (store the anchor, derive the sentence). This is a derived view over the node-owned forward refs; storage reification rides the engine adapter.
 
 ##### `attrtypes(): Set<string>`
 
@@ -360,11 +374,11 @@ Return all linktypes in the caudex.
 
 ##### `forerefs(id: string): string[] | undefined`
 
-Returns node ids for **all** nodes the given node id references via any ref kind -- the union of `foreattrs` / `forelinks` / `foreembeds` targets (deduped; surveyed attr → link → embed). The mirror of `backrefs()`; read straight off the node's forward fields, no index needed.
+Returns node ids for **all** nodes the given node id references via any ref kind: the union of `foreattrs` / `forelinks` / `foreembeds` targets (deduped; surveyed attr → link → embed). The mirror of `backrefs()`; read straight off the node's forward fields, no index needed.
 
 ##### `backrefs(id: string): string[] | undefined`
 
-Returns node ids for **all** nodes that reference the given node id via any ref kind -- the union of `backattrs` / `backlinks` / `backembeds` sources.
+Returns node ids for **all** nodes that reference the given node id via any ref kind: the union of `backattrs` / `backlinks` / `backembeds` sources.
 
 ##### `foreattrs(id: string): Attrs | undefined`
 
@@ -413,7 +427,7 @@ caudex.connect('1', '2', EDGE.KIND.EMBED);                    // doc-embed (no m
 caudex.connect('1', '2', EDGE.KIND.EMBED, NODE.MEDIA.IMAGE);  // media-embed
 ```
 
-...or pass a `ConnectOpts` object (`{ kind, type?, header?, media?, position? }`) -- `header` scopes a link/embed to a header section (attrs do not support headers); `media` picks the embed media kind (`pdf`/`audio`/`image`/`video`); `position` is the occurrence anchor (a link at a different position is a distinct occurrence, not a duplicate). Media-absence means a doc-transclusion -- markdown is not a media kind.
+...or pass a `ConnectOpts` object (`{ kind, type?, header?, media?, position? }`): `header` scopes a link/embed to a header section (attrs do not support headers); `media` picks the embed media kind (`pdf`/`audio`/`image`/`video`); `position` is the occurrence anchor (a link at a different position is a distinct occurrence, not a duplicate). Media-absence means a doc-transclusion; markdown is not a media kind.
 
 (Useful for file and link creation)
 
@@ -434,5 +448,5 @@ Transfer the relationships from the `source` node to the `target` node via their
 Disconnect a `source` node id from a `target` node id. Accepts the same positional and options forms as `connect()`. A given `position` removes only that occurrence; omitting it is position-blind (removes the first match regardless of anchor).
 
 
-[^inspire]: Logo inspired by [databases](https://cdn-icons-png.flaticon.com/512/20/20093.png) and [caudexes](https://www.google.com/search?q=caudex&source=lnms&tbm=isch&sa=X&ved=2ahUKEwiD_LbPwr36AhUsRTABHdXOBq0Q_AUoAXoECAIQAw&biw=1011&bih=800&dpr=2) -- especially [this one](https://thumbs.dreamstime.com/z/adenium-shrub-branched-caudex-green-foliage-illustration-colored-pencils-229255411.jpg).
+[^inspire]: Logo inspired by [databases](https://cdn-icons-png.flaticon.com/512/20/20093.png) and [caudexes](https://www.google.com/search?q=caudex&source=lnms&tbm=isch&sa=X&ved=2ahUKEwiD_LbPwr36AhUsRTABHdXOBq0Q_AUoAXoECAIQAw&biw=1011&bih=800&dpr=2), especially [this one](https://thumbs.dreamstime.com/z/adenium-shrub-branched-caudex-green-foliage-illustration-colored-pencils-229255411.jpg).
 [^sequential]: `compose()` probably smells a bit like `nn.Sequential(...)`, but in the declarative layers-in-a-list sense. The difference is that pytorch's stack transforms *data* flowing through at call time, while this stack extends the *API* at compose time: Each layer adds capabilities to the object rather than passing a tensor along.
