@@ -17,6 +17,10 @@ export { DerivedIndex, NodeStore } from './store';
 export type { ChangeEvent, ChangeKind, ChangeListener, DefineIndexOpts, StoragePort } from './store';
 export type { Edge, EdgeQueryOpts } from './edge';
 export * from './const';
+// the node/graph vocabulary as lightweight string-union types (derived from the
+// const.ts enums), for consumers that want the words. `import type` erases these,
+// so no runtime/engine is pulled — no separate subpath needed.
+export type { NodeState, NodePhase, ResolvedLink } from './contract';
 export type { FilterOpts, PayloadOpt, QueryOpts, ConnectOpts, DisconnectOpts } from './types';
 
 // the full composition: functions over hashes. Layer functions (base / tree /
